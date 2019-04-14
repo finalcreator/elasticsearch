@@ -1,0 +1,17 @@
+es7.0版本对应的client版本至少为：
+<dependency>
+    <groupId>org.elasticsearch.client</groupId>
+    <artifactId>transport</artifactId>
+    <version>6.7.0</version>
+</dependency>
+否则会报错：
+Received message from unsupported version: [6.4.3] minimal compatible version is: [6.7.0]
+对应spring data elasticsearch版本为：
+https://github.com/spring-projects/spring-data-elasticsearch
+spring  elasticsearch
+3.2.x 	6.5.0
+3.1.x 	6.2.2
+3.0.x 	5.5.0
+2.1.x 	2.4.0
+2.0.x 	2.2.0
+1.3.x 	1.5.2
