@@ -1,0 +1,13 @@
+package com.es.simpleelasticsearch.repository;
+
+import com.es.simpleelasticsearch.model.User;
+import org.springframework.data.elasticsearch.repository.ElasticsearchRepository;
+
+import java.util.List;
+
+/*
+* 实际上是使用了JAP的PagingAndSortingRepository
+* */
+public interface UserRepository extends ElasticsearchRepository<User, Long> {
+
+}
