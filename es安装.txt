@@ -27,3 +27,7 @@ vim config/elasticsearch.yml
 kibana：
 vim config/kibana.yml
 修改server.host: "0.0.0.0"， 再重启。
+
+四. stop elaticsearch
+jps查看进程号，或者netstat -lnp | grep 9200 通过端口号查询进程号
+kill 进程
