@@ -31,3 +31,6 @@ vim config/kibana.yml
 四. stop elaticsearch
 jps查看进程号，或者netstat -lnp | grep 9200 通过端口号查询进程号
 kill 进程
+
+五. 9200是es对外的默认端口号，暴露restful接口，
+9300是es集群之间通讯默认的端口号（外部无法访问）
