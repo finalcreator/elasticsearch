@@ -1,0 +1,78 @@
+#crate an index which name is customer and its id=1,name="Jole Luo"
+PUT /customer/_doc/1
+{
+  "name": "Jole Luo"
+}
+
+#search doc from index customer which id=1
+GET /customer/_doc/1
+
+#see all indices
+GET /_cat/indices?v=true
+
+#By default, the hits section of the response includes the first 10 documents that match the search criteria
+GET /bank/_search
+{
+  "query": { "match_all": {} },
+  "sort": [
+    { "account_number": "asc" }
+  ]
+}
+
+GET /bank/_search
+{
+  "query": { "match_all": {} },
+  "sort": [
+    { "account_number": "asc" }
+  ],
+  "from": 10,
+  "size": 10
+}
+
+#address contains mill or lane, ignoring case
+GET /bank/_search
+{
+  "query": { "match": { "address": "mill lane" } }
+}
+
+#address matches which contains "mill lane' only, ignoring case
+GET /bank/_search
+{
+  "query": { "match_phrase": { "address": "mill lane" } }
+}
+
+
+#bool query. search age=40 and state != "ID". By default, case is ignored 
+#Each must, should, and must_not element in a Boolean query is referred to as a query clause. How well a document meets the criteria in each must or should clause contributes to the document’s relevance score. The higher the score, the better the document matches your search criteria. By default, Elasticsearch returns documents ranked by these relevance scores.
+
+GET /bank/_search
+{
+  "query": {
+    "bool": {
+      "must": [
+        { "match": { "age": "40" } }
+      ],
+      "must_not": [
+        { "match": { "state": "ID" } }
+      ]
+    }
+  }
+}
+
+#use filter
+GET /bank/_search
+{
+  "query": {
+    "bool": {
+      "must": { "match_all": {} },
+      "filter": {
+        "range": {
+          "balance": {
+            "gte": 20000,
+            "lte": 30000
+          }
+        }
+      }
+    }
+  }
+}
