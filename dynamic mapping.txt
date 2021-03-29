@@ -1,0 +1,119 @@
+1. dynamic mapping定义
+One of the most important features of Elasticsearch is that it tries to get out of your way 
+and let you start exploring your data as quickly as possible. To index a document, 
+you don’t have to first create an index, define a mapping type, and 
+define your fields — you can just index a document and the index, type, and 
+fields will display automatically
+例1：
+PUT data/_doc/1 
+{ "count": 5 }
+Creates the data index, the _doc mapping type, and a field called count with data type long.
+即dynamic mapping, 会将count自动识别为long类型。
+
+When dynamic field mapping is enabled, Elasticsearch uses the rules in the following table 
+to determine how to map data types for each field.
+https://www.elastic.co/guide/en/elasticsearch/reference/current/dynamic-field-mapping.html
+
+2. 分类
+1）Dynamic field mappings
+The rules governing dynamic field detection.
+2）Dynamic templates
+Custom rules to configure the mapping for dynamically added fields.
+
+3. 与index template的区别
+Index templates allow you to configure the default mappings, 
+settings and aliases for new indices, whether created automatically or explicitly.
+
+4. 定制化映射规则
+You can customize dynamic field mapping rules for date detection and numeric detection.
+To define custom mappings rules that you can apply to additional dynamic fields, 
+use dynamic_templates.
+
+5. 时间日期
+The default value for dynamic_date_formats is:
+[ "strict_date_optional_time","yyyy/MM/dd HH:mm:ss Z||yyyy/MM/dd Z"]
+例2：
+PUT my-index-000001/_doc/1
+{
+  "create_date": "2021/03/29"
+}
+//可查看属性的类型等
+GET my-index-000001/_mapping
+结果：
+{
+    "my-index-000001" : {
+      "mappings" : {
+        "properties" : {
+          "create_date" : {
+            "type" : "date",
+            "format" : "yyyy/MM/dd HH:mm:ss||yyyy/MM/dd||epoch_millis"
+          }
+        }
+      }
+    }
+}
+可以看到，只要按照"yyyy/MM/dd HH:mm:ss Z||yyyy/MM/dd Z"这种格式写入的，es自动将类型识别为date，
+这就是dynamic mapping的作用。
+
+例3： 禁用date_detection：
+DELETE my-index-000001
+PUT my-index-000001
+{
+  "mappings": {
+    "date_detection": false
+  }
+}
+PUT my-index-000001/_doc/1
+{
+  "create_date": "2021/03/29"
+}
+这时候，就是text字符串了，而不是date类型了：
+{
+    "my-index-000001" : {
+      "mappings" : {
+        "date_detection" : false,
+        "properties" : {
+          "create_date" : {
+            "type" : "text",
+            "fields" : {
+              "keyword" : {
+                "type" : "keyword",
+                "ignore_above" : 256
+              }
+            }
+          }
+        }
+      }
+    }
+}
+
+例4： 定制化格式
+DELETE my-index-000001
+PUT my-index-000001
+{
+  "mappings": {
+    "dynamic_date_formats": ["yyyy-MM-dd HH:mm:ss"]
+  }
+}
+
+PUT my-index-000001/_doc/1
+{
+  "create_date": "2021-03-29 22:10:13"
+}
+这时候create_date仍然是date类型。
+
+6. 数字检测
+DELETE my-index-000001
+PUT my-index-000001
+{
+  "mappings": {
+    "numeric_detection": true
+  }
+}
+
+PUT my-index-000001/_doc/1
+{
+  "my_float":   "1.0", 
+  "my_integer": "1" 
+}
+虽然写成了字符串，但这时候仍然能识别为float和long类型
