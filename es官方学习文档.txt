@@ -9,3 +9,28 @@ curl -H "Content-Type: application/json" -XPOST "localhost:9200/bank/_bulk?prett
 yellow open   bank                            mb-vmkZcR-a5dmKnR8GzBQ   1   1       1000            0    379.3kb        379.3kb
 如果没有使用kibana,  curl "localhost:9200/_cat/indices?v=true"
 
+查看集群健康状况
+GET _cluster/health
+
+{
+    "cluster_name" : "elasticsearch",
+    "status" : "yellow",
+    "timed_out" : false,
+    "number_of_nodes" : 1,
+    "number_of_data_nodes" : 1,
+    "active_primary_shards" : 12,
+    "active_shards" : 12,
+    "relocating_shards" : 0,
+    "initializing_shards" : 0,
+    "unassigned_shards" : 4,
+    "delayed_unassigned_shards" : 0,
+    "number_of_pending_tasks" : 0,
+    "number_of_in_flight_fetch" : 0,
+    "task_max_waiting_in_queue_millis" : 0,
+    "active_shards_percent_as_number" : 75.0
+}
+
+status : yellow 表示主分片正常分配，有副本分片未分配
+         green  主分片副本分片都正常分配
+         red  有主分片未正常分配
+  
