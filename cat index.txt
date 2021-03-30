@@ -1,0 +1,83 @@
+1. GET bank 查看bank这个index的信息
+{
+    "bank" : { #index的名字
+      "aliases" : { },
+      "mappings" : { #index的mapping
+        "properties" : {
+          "account_number" : {
+            "type" : "long"
+          },
+          "address" : {
+            "type" : "text",
+            "fields" : {
+              "keyword" : {
+                "type" : "keyword",
+                "ignore_above" : 256
+              }
+            }
+          },
+          "age" : {
+            "type" : "long"
+          }
+        }
+      },
+      "settings" : {
+        "index" : {
+          "routing" : {
+            "allocation" : {
+              "include" : {
+                "_tier_preference" : "data_content"
+              }
+            }
+          },
+          "number_of_shards" : "1", #主分片数量
+          "provided_name" : "bank",
+          "creation_date" : "1616150779867",
+          "number_of_replicas" : "1", #副本分片数量
+          "uuid" : "mb-vmkZcR-a5dmKnR8GzBQ",
+          "version" : {
+            "created" : "7110299"
+          }
+        }
+      }
+    }
+}
+
+2. 查看索引文档的总数
+GET bank/_count
+result:
+{
+    "count" : 1000,
+    "_shards" : {
+      "total" : 1,
+      "successful" : 1,
+      "skipped" : 0,
+      "failed" : 0
+    }
+}
+
+3. 查看前10条文档，了解文档格式
+POST bank/_search
+{
+}
+
+4. _cat indices API
+#查看indices
+GET /_cat/indices/kibana*?v&s=index
+
+#查看状态为绿的索引
+GET /_cat/indices?v&health=green
+
+#按照文档个数排序
+GET /_cat/indices?v&s=docs.count:desc
+
+#查看具体的字段
+GET /_cat/indices/kibana*?pri&v&h=health,index,pri,rep,docs.count,mt
+
+#How much memory is used per index?
+GET /_cat/indices?v&h=i,tm&s=tm:desc
+
+
+## 相关阅读
+- 为什么不再支持单个Index下，多个Tyeps https://www.elastic.co/cn/blog/moving-from-types-to-typeless-apis-in-elasticsearch-7-0
+- CAT Index API https://www.elastic.co/guide/en/elasticsearch/reference/7.1/cat-indices.html

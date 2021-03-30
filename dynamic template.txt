@@ -1,0 +1,267 @@
+1. dynamic template定义
+Dynamic templates allow you greater control of how Elasticsearch maps your data 
+beyond the default dynamic field mapping rules. You enable dynamic mapping 
+by setting the dynamic parameter to true or runtime. You can then use dynamic templates 
+to define custom mappings that can be applied to dynamically added fields 
+based on the matching condition:
+1）match_mapping_type operates on the data type that Elasticsearch detects
+2）match and unmatch use a pattern to match on the field name
+3）path_match and path_unmatch operate on the full dotted path to the field
+Use the {name} and {dynamic_type} template variables in the mapping specification as placeholders.
+
+2. dynamic template 模板
+"dynamic_templates": [
+    {
+      "my_template_name": { 
+        ...  match conditions ... 
+        "mapping": { ... } 
+      }
+    },
+    ...
+]
+	
+The template name can be any string value.
+The match conditions can include any of : match_mapping_type, match, match_pattern, unmatch, path_match, path_unmatch.
+The mapping that the matched field should use.
+
+
+3. dynamic template的验证
+If a provided mapping contains an invalid mapping snippet, a validation error is returned. 
+Validation occurs when applying the dynamic template at index time, and, in most cases, 
+when the dynamic template is updated. Providing an invalid mapping snippet may cause the 
+update or validation of a dynamic template to fail under certain conditions:
+
+1）If no match_mapping_type has been specified but the template is valid for 
+at least one predefined mapping type, the mapping snippet is considered valid. 
+However, a validation error is returned at index time if a field matching the template 
+is indexed as a different type. （必须匹配match_mapping_type或者预置的映射类型，否则validation error）
+For example, configuring a dynamic template with no match_mapping_type is considered valid 
+as string type, but if a field matching the dynamic template is indexed as a long, 
+a validation error is returned at index time. 
+It is recommended to configure the match_mapping_type to the expected JSON type or
+configure the desired type in the mapping snippet.
+（因为JSON 本身就是文本格式（字符串）的，与其他程序进行数据交换时，传递的就是字符串。但是接收后，需要转为合适的类型）
+2）If the {name} placeholder is used in the mapping snippet, validation is skipped 
+when updating the dynamic template. This is because the field name is unknown at that time. 
+Instead, validation occurs when the template is applied at index time.
+
+Templates are processed in order — the first matching template wins. (第一个匹配的就结束)
+When putting new dynamic templates through the update mapping API, 
+all existing templates are overwritten. 
+This allows for dynamic templates to be reordered or deleted after they were initially added.
+
+4. 映射运行时字段
+If you want Elasticsearch to dynamically map new fields of a certain type as runtime fields, 
+set "dynamic":"runtime" in the index mappings. 
+These fields are not indexed, and are loaded from _source at query time.
+这样的运行时字段是不能被索引的，那么该怎么做？
+Alternatively, you can use the default dynamic mapping rules and then 
+create dynamic templates to map specific fields as runtime fields. 
+You set "dynamic":"true" in your index mapping, and then create a dynamic template to 
+map new fields of a certain type as runtime fields.
+例1：you can create a dynamic template that maps new strings as runtime fields of type ip
+定义了一个叫做strings_as_ip的dynamic template, 将string类型且以ip开头的字段，运行时字段类型定义为ip类型
+PUT my-index-000001/
+{
+  "mappings": {
+    "dynamic_templates": [
+      {
+        "strings_as_ip": {
+          "match_mapping_type": "string",
+          "match": "ip*",
+          "runtime": {
+            "type": "ip"
+          }
+        }
+      }
+    ]
+  }
+}
+GET my-index-000001/_mapping
+
+PUT my-index-000001/_doc/1
+{
+  "ipAddr1": "128.2.2.1",
+  "ipAddr2": "128.0.0.1"
+}
+
+GET my-index-000001/_doc/1
+
+{
+    "my-index-000001" : {
+      "mappings" : {
+        "dynamic_templates" : [
+          {
+            "strings_as_ip" : {
+              "match" : "ip*",
+              "match_mapping_type" : "string",
+              "runtime" : {
+                "type" : "ip"
+              }
+            }
+          }
+        ],
+        "runtime" : {
+          "ipAddr1" : {
+            "type" : "ip"
+          },
+          "ipAddr2" : {
+            "type" : "ip"
+          }
+        }
+      }
+    }
+}
+
+
+5. 例2
+PUT my-index-000001
+{
+  "mappings": {
+    "dynamic_templates": [
+      {
+        "integers": {
+          "match_mapping_type": "long",
+          "mapping": {
+            "type": "integer"
+          }
+        }
+      },
+      {
+        "strings": {
+          "match_mapping_type": "string",
+          "mapping": {
+            "type": "text",
+            "fields": {
+              "raw": {
+                "type":  "keyword",
+                "ignore_above": 256
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}
+
+PUT my-index-000001/_doc/1
+{
+  "my_integer": 5, 
+  "my_string": "Some string" 
+}
+GET my-index-000001/_doc/1
+GET my-index-000001/_mapping
+可以看到my_integer从long转化为了integer, 而字符串my_string被转化为了text, 并带一个keyword.
+
+6. 例3 match和unmatch
+PUT my-index-000001
+{
+  "mappings": {
+    "dynamic_templates": [
+      {
+        "longs_as_strings": {
+          "match_mapping_type": "string",
+          "match":   "long_*",
+          "unmatch": "*_text",
+          "mapping": {
+            "type": "long"
+          }
+        }
+      }
+    ]
+  }
+}
+
+PUT my-index-000001/_doc/1
+{
+  "long_num": "5", 
+  "long_text": "foo" 
+}
+GET my-index-000001/_doc/1
+GET my-index-000001/_mapping
+long_num 满足 “long_*”的条件，因此被映射为long, 而long_text由于满足unmatch的条件“*_text”，因此不会被
+映射为long, 保留默认的text带key.
+
+6. path_match and path_unmatch
+PUT my-index-000001
+{
+  "mappings": {
+    "dynamic_templates": [
+      {
+        "full_name": {
+          "path_match":   "name.*",
+          "path_unmatch": "*.middle",
+          "mapping": {
+            "type": "text",
+            "copy_to": "full_name"
+          }
+        }
+      }
+    ]
+  }
+}
+
+PUT my-index-000001/_doc/1
+{
+  "name": {
+    "first":  "John",
+    "middle": "Winston",
+    "last":   "Lennon"
+  }
+}
+GET my-index-000001/_doc/1
+GET my-index-000001/_mapping
+
+下面会报错，因为title不是一个string,无法映射为text
+PUT my-index-000001/_doc/2
+{
+  "name": {
+    "first":  "Paul",
+    "last":   "McCartney",
+    "title": {
+      "value": "Sir",
+      "category": "order of chivalry"
+    }
+  }
+}
+
+7. placeholder {name} 和 {dynamic_type}
+PUT my-index-000001
+{
+  "mappings": {
+    "dynamic_templates": [
+      {
+        "named_analyzers": {
+          "match_mapping_type": "string",
+          "match": "*",
+          "mapping": {
+            "type": "text",
+            "analyzer": "{name}"
+          }
+        }
+      },
+      {
+        "no_doc_values": {
+          "match_mapping_type":"*",
+          "mapping": {
+            "type": "{dynamic_type}"
+          }
+        }
+      }
+    ]
+  }
+}
+
+PUT my-index-000001/_doc/1
+{
+  "english": "Some English text", 
+  "count":   5 
+}
+GET my-index-000001/_doc/1
+GET my-index-000001/_mapping
+可以看到例子中{dynamic_type}就是long, 因为count传入5，dynamic template默认就是long型。
+而analyzer就是english, 对应{name}
+
+Elasticsearch automatically detects the following data types：
+https://www.elastic.co/guide/en/elasticsearch/reference/current/dynamic-templates.html#match-unmatch

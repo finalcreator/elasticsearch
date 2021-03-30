@@ -1,3 +1,4 @@
+1. 常见查询
 #crate an index which name is customer and its id=1,name="Jole Luo"
 PUT /customer/_doc/1
 {
@@ -74,5 +75,52 @@ GET /bank/_search
         }
       }
     }
+  }
+}
+
+2. 查询结果解释
+GET /bank/_search
+{
+  "query": { "match": { "address": "mill lane" } },
+  "from": 0,
+  "size": 1
+}
+
+{
+  "took" : 0,
+  "timed_out" : false,
+  "_shards" : {
+    "total" : 1,
+    "successful" : 1,
+    "skipped" : 0,
+    "failed" : 0
+  },
+  "hits" : {
+    "total" : {
+      "value" : 19,
+      "relation" : "eq"
+    },
+    "max_score" : 9.507477,
+    "hits" : [ #hits里记录了满足条件的数据
+      {
+        "_index" : "bank", #doc所在的index
+        "_type" : "_doc", #7.0后，type默认都是_doc
+        "_id" : "136", #id, 唯一
+        "_score" : 9.507477, #评分越高，说明搜索出的结果相关度越高
+        "_source" : {  #文档原始的json数据
+          "account_number" : 136,
+          "balance" : 45801,
+          "firstname" : "Winnie",
+          "lastname" : "Holland",
+          "age" : 38,
+          "gender" : "M",
+          "address" : "198 Mill Lane",
+          "employer" : "Neteria",
+          "email" : "winnieholland@neteria.com",
+          "city" : "Urie",
+          "state" : "IL"
+        }
+      }
+    ]
   }
 }

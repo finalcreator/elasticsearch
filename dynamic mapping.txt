@@ -117,3 +117,9 @@ PUT my-index-000001/_doc/1
   "my_integer": "1" 
 }
 虽然写成了字符串，但这时候仍然能识别为float和long类型
+
+7. 一个注意点
+Dynamic field mappings are only added when a field contains a concrete value — not null 
+or an empty array. If the null_value option is used in a dynamic_template, 
+it will only be applied after the first document with a concrete value 
+for the field has been indexed.
