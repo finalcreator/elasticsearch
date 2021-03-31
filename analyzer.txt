@@ -1,0 +1,80 @@
+1. analyzer分词器，专门处理分词的。
+
+2. analyzer的组成
+Character Filter  去除html
+Tokenizer 将文本按照规则拆分为单词
+Token Filters 过滤拆分的单词，比如删除、转小写、过滤stopword等
+
+3. 内置分词器
+Standard Analyzer - 默认分词器，按词切分，小写处理
+Simple Analyzer - 按照非字母切分（符号被过滤），小写处理
+Stop Analyzer - 小写处理，停用词过滤（the ，a，is）
+Whitespace Analyzer - 按照空格切分，不转小写
+Keyword Analyzer - 不分词，直接将输入当做输出
+Pattern Analyzer - 正则表达式，默认 \W+
+Language - 提供了 30 多种常见语言的分词器
+Customer Analyzer - 自定义分词器
+
+4. 使用分词器
+例1：
+GET _analyze
+{
+  "analyzer": "standard",
+  "text": "Master Es, Beats, Kibana"
+}
+可以看到，标点符号和空格都被过滤了,而且转为了小写。
+{
+    "tokens" : [
+      {
+        "token" : "master",
+        "start_offset" : 0,
+        "end_offset" : 6,
+        "type" : "<ALPHANUM>",
+        "position" : 0
+      },
+      {
+        "token" : "es",
+        "start_offset" : 7,
+        "end_offset" : 9,
+        "type" : "<ALPHANUM>",
+        "position" : 1
+      },
+      {
+        "token" : "beats",
+        "start_offset" : 11,
+        "end_offset" : 16,
+        "type" : "<ALPHANUM>",
+        "position" : 2
+      },
+      {
+        "token" : "kibana",
+        "start_offset" : 18,
+        "end_offset" : 24,
+        "type" : "<ALPHANUM>",
+        "position" : 3
+      }
+    ]
+}
+
+例2：
+使用空格分词器，然后再转为小写
+GET _analyze
+{
+  "tokenizer": "whitespace",
+  "filter": ["lowercase"],
+  "text": "Master Es, Beats, Kibana"
+}
+这时会保留标点符号，仅仅按照空格分词，再转为小写。
+
+例3: 指定index的字段进行测试
+POST my-index-000002/_analyze
+{
+  "field": "comment",
+  "text": "You know, Elasticsearch, kibana"
+}
+
+
+5. 中文分词器
+ik-analyzer
+icu-analyzer
+thulac
