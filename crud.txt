@@ -1,0 +1,101 @@
+1. PUT 如果不存在，则新创建一个index, 如果已经存在，就用原来的替换，且version+1
+PUT my-index-000002/_doc/1
+{
+  "user": "Mike",
+  "comment": "You know, for search"
+}
+
+2. crate 已经存在会报错，否则新建
+PUT my-index-000002/_create/1
+{
+  "user": "Jack",
+  "comment": "You know, for effective search"
+}
+以上失败
+
+PUT my-index-000002/_create/2
+{
+  "user": "Jack",
+  "comment": "You know, for effective search"
+}
+以上成功
+
+POST my-index-000002/_doc
+{
+  "user": "Tom",
+  "comment": "file beats?"
+}
+这种方式创建id会自增
+
+3. POST更新 更新的doc必须已经存在，只会更新对应的字段
+POST my-index-000002/_update/1
+{
+  "doc": {
+    "comment": "You know, Elasticsearch",
+    "gender": "Y"
+  }
+}
+
+4. GET查询
+GET my-index-000002/_doc/1
+result:
+{
+    "_index" : "my-index-000002",
+    "_type" : "_doc",
+    "_id" : "1",
+    "_version" : 4,
+    "_seq_no" : 4,
+    "_primary_term" : 1,
+    "found" : true,
+    "_source" : {
+      "user" : "Mike",
+      "comment" : "You know, Elasticsearch",
+      "gender" : "Y"
+    }
+}
+
+5. DELETE 删除
+DELETE  my-index-000002/_doc/2
+
+6. Bulk API 批量
+1）批量操作：
+POST _bulk
+{ "index": {"_index": "test", "_id": 1} }
+{ "user": "Jack", "age": 22 }
+{ "create": {"_index": "test", "_id": 2} }
+{ "user": "Tom1", "age": 10 }
+{ "delete": {"_index": "test", "_id": 2} }
+{ "create": {"_index": "test", "_id": 3} }
+{ "user": "Tom2", "age": 20 }
+{ "update": {"_index": "test", "_id": 1} }
+{ "doc": {"age": 21} }
+
+GET /test/_search
+{
+  "query": { "match_all": {} }
+}
+查询可以看到批量操作最终结果为只有id=1、age=21的Jack和id=2, 20岁的Tom
+注意的是，批量操作不会因为前一条失败而终止执行后面的。
+
+2）批量查询：
+GET _mget
+{
+  "docs": [
+    {
+      "_index": "test",
+      "_id": "1"
+    },
+    {
+      "_index": "my-index-000002",
+      "_id": "1"
+    }
+  ]
+}
+这样可以批量查询出两个不同index中的记录。
+
+3）批量搜索
+GET /test/_msearch
+{}#这里没写index就是上面的test
+{"query": {"match_all": {}}, "from":0, "size": 2}
+{"index": "my-index-000002"}
+{"query": {"match_all": {}}, "from":0, "size": 1}
