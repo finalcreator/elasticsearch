@@ -11,6 +11,101 @@ GET /customer/_doc/1
 #see all indices
 GET /_cat/indices?v=true
 
+#address contains mill or lane, ignoring case
+GET /bank/_search
+{
+  "query": { "match": { "address": "mill lane" } }
+}
+
+#address matches which contains "mill lane" only, ignoring case
+GET /bank/_search
+{
+  "query": { "match_phrase": { "address": "mill lane" } }
+}
+
+
+2. 查询结果解释
+GET /bank/_search
+{
+  "query": { "match": { "address": "mill lane" } },
+  "from": 0,
+  "size": 1
+}
+
+{
+  "took" : 0,
+  "timed_out" : false,
+  "_shards" : {
+    "total" : 1,
+    "successful" : 1,
+    "skipped" : 0,
+    "failed" : 0
+  },
+  "hits" : {
+    "total" : {
+      "value" : 19,
+      "relation" : "eq"
+    },
+    "max_score" : 9.507477,
+    "hits" : [ #hits里记录了满足条件的数据
+      {
+        "_index" : "bank", #doc所在的index
+        "_type" : "_doc", #7.0后，type默认都是_doc
+        "_id" : "136", #id, 唯一
+        "_score" : 9.507477, #评分越高，说明搜索出的结果相关度越高
+        "_source" : {  #文档原始的json数据
+          "account_number" : 136,
+          "balance" : 45801,
+          ......
+        }
+      }
+    ]
+  }
+}
+
+
+3. q查询和REQUEST Body查询
+需要通过Kibana导入Sample Data的电商数据。
+
+#URI Query  又称为q查询
+A search request can be executed purely using a URI by providing request parameters. 
+Not all search options are exposed when executing a search using this mode, 
+but it can be handy for quick "curl tests".
+
+GET kibana_sample_data_ecommerce/_search?q=customer_first_name:eddie
+GET kibana_sample_data_ecommerce/_search?q=eddie&df=customer_first_name 与上面等价，不写key值时就取df
+GET kibana*/_search?q=customer_first_name:Eddie
+GET /_all/_search?q=customer_first_name:Eddie
+
+#使用引号，Phrase查询, 必须都满足
+GET my-index-000002/_search?q=comment:"file beats"
+#match 一个单词即可
+GET my-index-000002/_search?q=comment:beats Elasticsearch
+#bool查询， 等价于beats OR Elasticsearch
+GET my-index-000002/_search?q=comment:(beats Elasticsearch)
+{
+  "profile": "true"
+}
+#包含beats但是不包含Elasticsearch
+GET my-index-000002/_search?q=comment:(beats NOT Elasticsearch)
+#模糊查询
+GET my-index-000002/_search?q=comment:(file b*)
+#beat、beats都可以匹配，即可以有2个差异
+GET my-index-000002/_search?q=comment:(bea~2)
+
+更多参考
+https://www.elastic.co/guide/en/elasticsearch/reference/7.0/search-uri-request.html
+
+#REQUEST Body
+POST kibana_sample_data_ecommerce/_search
+{
+	"profile": true,
+	"query": {
+		"match_all": {}
+	}
+}
+profile=true会返回查询的报告，即查询是如何执行的.
+
 #By default, the hits section of the response includes the first 10 documents that match the search criteria
 GET /bank/_search
 {
@@ -30,19 +125,8 @@ GET /bank/_search
   "size": 10
 }
 
-#address contains mill or lane, ignoring case
-GET /bank/_search
-{
-  "query": { "match": { "address": "mill lane" } }
-}
 
-#address matches which contains "mill lane' only, ignoring case
-GET /bank/_search
-{
-  "query": { "match_phrase": { "address": "mill lane" } }
-}
-
-
+4. bool查询
 #bool query. search age=40 and state != "ID". By default, case is ignored 
 #Each must, should, and must_not element in a Boolean query is referred to as a query clause. How well a document meets the criteria in each must or should clause contributes to the document’s relevance score. The higher the score, the better the document matches your search criteria. By default, Elasticsearch returns documents ranked by these relevance scores.
 
@@ -78,49 +162,78 @@ GET /bank/_search
   }
 }
 
-2. 查询结果解释
+
 GET /bank/_search
 {
-  "query": { "match": { "address": "mill lane" } },
-  "from": 0,
-  "size": 1
+  "query": { 
+    "bool": { 
+      "must": [
+        { "match": { "city":   "Sunriver" }},
+        { "match": { "state": "RI" }}
+      ],
+      "filter": [ 
+        { "term":  { "gender": "F" }},
+        { "range": { "age": { "gte": "22" }}}
+      ]
+    }
+  }
 }
 
+5. query_string and simple_query_string
+PUT /users/_doc/1
 {
-  "took" : 0,
-  "timed_out" : false,
-  "_shards" : {
-    "total" : 1,
-    "successful" : 1,
-    "skipped" : 0,
-    "failed" : 0
-  },
-  "hits" : {
-    "total" : {
-      "value" : 19,
-      "relation" : "eq"
-    },
-    "max_score" : 9.507477,
-    "hits" : [ #hits里记录了满足条件的数据
-      {
-        "_index" : "bank", #doc所在的index
-        "_type" : "_doc", #7.0后，type默认都是_doc
-        "_id" : "136", #id, 唯一
-        "_score" : 9.507477, #评分越高，说明搜索出的结果相关度越高
-        "_source" : {  #文档原始的json数据
-          "account_number" : 136,
-          "balance" : 45801,
-          "firstname" : "Winnie",
-          "lastname" : "Holland",
-          "age" : 38,
-          "gender" : "M",
-          "address" : "198 Mill Lane",
-          "employer" : "Neteria",
-          "email" : "winnieholland@neteria.com",
-          "city" : "Urie",
-          "state" : "IL"
-        }
-      }
-    ]
+  "name":"Ruan Yiming",
+  "about":"java, golang, node, swift, elasticsearch"
+}
+
+PUT /users/_doc/2
+{
+  "name":"Li Yiming",
+  "about":"Hadoop"
+}
+
+
+POST users/_search
+{
+  "query": {
+    "query_string": {
+      "default_field": "name",
+      "query": "Ruan AND Yiming"
+    }
+  }
+}
+
+
+POST users/_search
+{
+  "query": {
+    "query_string": {
+      "fields":["name","about"],
+      "query": "(Ruan AND Yiming) OR (Java AND Elasticsearch)"
+    }
+  }
+}
+
+
+#Simple Query 默认的operator是 Or
+POST users/_search
+{
+  "query": {
+    "simple_query_string": {
+      "query": "Ruan AND Yiming",
+      "fields": ["name"]
+    }
+  }
+}
+
+
+POST users/_search
+{
+  "query": {
+    "simple_query_string": {
+      "query": "Ruan Yiming",
+      "fields": ["name"],
+      "default_operator": "AND"
+    }
   }
 }
