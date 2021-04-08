@@ -1,0 +1,130 @@
+1. term查询
+Term Level Query: Term Query / Range Query / Exists Query / Prefix Query /Wildcard Query 
+● 在 ES 中，Term 查询，对输⼊不做分词。会将输⼊作为⼀个整体，在倒排索引中查找准确的词项，并
+且使⽤相关度算分公式为每个包含该词项的⽂档进⾏相关度算分 – 例如“Apple Store”。
+● 可以通过 Constant Score 将查询转换成⼀个 Filtering，避免算分，并利⽤缓存，提⾼性能。
+
+2. 数据准备
+DELETE products
+PUT products
+{
+  "settings": {
+    "number_of_shards": 1
+  }
+}
+
+POST products/_bulk
+{ "index": {"_id":1} }
+{ "productID":"ASDF-GHJK-LPOI", "desc":"Huawei"}
+{ "index": {"_id":2} }
+{ "productID":"ASDF-GHJK-LPOI", "desc":"iPhone"}
+{ "index": {"_id":3} }
+{ "productID":"ASDF-GHJK-LPOI", "desc":"Samsung"}
+
+GET /products
+
+3. 理解term查询
+
+POST products/_search
+{
+  "query":{
+    "term": {
+      "desc": {
+        "value": "iphone"
+      }
+    }
+  }
+}
+能查询出id=2的产品
+
+POST products/_search
+{
+  "query":{
+    "term": {
+      "desc": {
+        "value": "iPhone"
+      }
+    }
+  }
+}
+查询不到
+
+同理，下面的语句也查询不到
+POST products/_search
+{
+  "query": {
+    "term": {
+      "productID": {
+        "value": "ASDF-GHJK-LPOI"
+      }
+    }
+  }
+}
+
+该例子说明term查询对于输入是不分词的，而批量加入的产品信息默认是用stadard analizer分词了。
+
+4. term keyword查询
+POST products/_search
+{
+  "query":{
+    "term": {
+      "desc.keyword": {
+        "value": "iPhone"
+      }
+    }
+  }
+}
+通过keyword可以查到。
+
+GET products/_mapping 可以看到
+dynamic mapping默认将字符串，定为了text类型，并且加入了keyword属性，keyword在写入时不会做分词处理，所以会严格进行匹配。
+{
+    "products" : {
+      "mappings" : {
+        "properties" : {
+          "desc" : {
+            "type" : "text",
+            "fields" : {
+              "keyword" : {
+                "type" : "keyword",
+                "ignore_above" : 256
+              }
+            }
+          },
+          "productID" : {
+            "type" : "text",
+            "fields" : {
+              "keyword" : {
+                "type" : "keyword",
+                "ignore_above" : 256
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+
+5. 使用Constant Score避免算分, 可提升性能
+POST products/_search
+{
+  "query":{
+    "constant_score": {
+      "filter": {
+        "term": {
+          "desc": {
+            "value": "iphone"
+          }
+        }
+      },
+      "boost": 1.2
+    }
+  }
+}
+
+6. term查询对输入不分词，但前面用过的match查询、match phase查询是分词的。
+
+## 相关阅读
+- https://www.elastic.co/guide/en/elasticsearch/reference/7.1/term-level-queries.html
+- https://www.elastic.co/guide/en/elasticsearch/reference/7.1/full-text-queries.html

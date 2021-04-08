@@ -1,0 +1,26 @@
+1. 结构化搜索
+结构化搜索（Structured search） 是指对结构化数据的搜索
+○ ⽇期，布尔类型和数字都是结构化的
+● ⽂本也可以是结构化的。
+○ 如彩⾊笔可以有离散的颜⾊集合： 红（red） 、 绿（green） 、 蓝（blue）
+○ ⼀个博客可能被标记了标签，例如，分布式（distributed） 和 搜索（search）
+
+ES中的结构化搜索：
+布尔，时间，⽇期和数字这类结构化数据：有精确的格式，我们可以对这些格式进⾏逻辑操
+作。包括⽐较数字或时间的范围，或判定两个值的⼤⼩。
+● 结构化的⽂本可以做精确匹配或者部分匹配： Term 查询 / Prefix 前缀查询
+● 结构化结果只有“是”或“否”两个值，根据场景需要，可以决定结构化搜索是否需要打分(使用Constant Score)。
+
+
+3. exists
+POST products/_search
+{
+  "query":{
+    "exists": {
+      "field": "productID"
+    }
+  }
+}
+
+
+参考： https://www.elastic.co/guide/en/elasticsearch/reference/current/term-level-queries.html
