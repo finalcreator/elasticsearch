@@ -125,61 +125,7 @@ GET /bank/_search
   "size": 10
 }
 
-
-4. bool查询
-#bool query. search age=40 and state != "ID". By default, case is ignored 
-#Each must, should, and must_not element in a Boolean query is referred to as a query clause. How well a document meets the criteria in each must or should clause contributes to the document’s relevance score. The higher the score, the better the document matches your search criteria. By default, Elasticsearch returns documents ranked by these relevance scores.
-
-GET /bank/_search
-{
-  "query": {
-    "bool": {
-      "must": [
-        { "match": { "age": "40" } }
-      ],
-      "must_not": [
-        { "match": { "state": "ID" } }
-      ]
-    }
-  }
-}
-
-#use filter
-GET /bank/_search
-{
-  "query": {
-    "bool": {
-      "must": { "match_all": {} },
-      "filter": {
-        "range": {
-          "balance": {
-            "gte": 20000,
-            "lte": 30000
-          }
-        }
-      }
-    }
-  }
-}
-
-
-GET /bank/_search
-{
-  "query": { 
-    "bool": { 
-      "must": [
-        { "match": { "city":   "Sunriver" }},
-        { "match": { "state": "RI" }}
-      ],
-      "filter": [ 
-        { "term":  { "gender": "F" }},
-        { "range": { "age": { "gte": "22" }}}
-      ]
-    }
-  }
-}
-
-5. query_string and simple_query_string
+4. query_string and simple_query_string
 PUT /users/_doc/1
 {
   "name":"Ruan Yiming",

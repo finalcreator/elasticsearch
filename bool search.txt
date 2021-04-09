@@ -1,0 +1,142 @@
+5. bool search
+#Each must, should, and must_not element in a Boolean query is referred to as a query clause. 
+#How well a document meets the criteria in each must or should clause contributes to the document’s relevance score. 
+#The higher the score, the better the document matches your search criteria. 
+#By default, Elasticsearch returns documents ranked by these relevance scores.
+must 必须匹配。 贡献算分
+should 选择性匹配。贡献算分
+must_not 
+Filter Context
+查询字句，必须不能匹配，不影响算分
+filter 
+Filter Context 必须匹配，但是不贡献算分
+
+相关性并不只是全⽂本检索的专利。也适⽤于 yes | no 的⼦句，匹配的⼦句越多，相关性评分
+越⾼。如果多条查询⼦句被合并为⼀条复合查询语句 ，⽐如 bool 查询，则每个查询⼦句计算
+得出的评分会被合并到总的相关性评分中。
+
+#bool query. search age=40 and state != "ID". By default, case is ignored 
+GET /bank/_search
+{
+  "query": {
+    "bool": {
+      "must": [
+        { "match": { "age": "40" } }
+      ],
+      "must_not": [
+        { "match": { "state": "ID" } }
+      ]
+    }
+  }
+}
+
+#use filter
+GET /bank/_search
+{
+  "query": {
+    "bool": {
+      "must": { "match_all": {} },
+      "filter": {
+        "range": {
+          "balance": {
+            "gte": 20000,
+            "lte": 30000
+          }
+        }
+      }
+    }
+  }
+}
+
+# 多条件查询
+GET /bank/_search
+{
+  "query": { 
+    "bool": { 
+      "must": [
+        { "match": { "city":   "Sunriver" }},
+        { "match": { "state": "RI" }}
+      ],
+      "filter": [ 
+        { "range": { "age": { "gte": "22" }}}
+      ]
+    }
+  }
+}
+
+
+# minimum_should_match为1，表示should里面满足1个即可
+POST /products/_search
+{
+  "query": {
+    "bool" : {
+      "must" : {
+        "term" : { "price" : "3000" }
+      },
+      "must_not" : {
+        "range" : {
+          "price" : { "lte" : 10 }
+        }
+      },
+      "should" : [
+        { "term" : { "productID.keyword" : "ASDF-GHJK-LPOI" } },
+        { "term" : { "productID.keyword" : "XHDK-A-1293-#fJ3" } }
+      ],
+      "minimum_should_match" :1
+    }
+  }
+}
+
+
+在term search中，对于数组中有多个值的情况，只要包含即可查询出
+POST my-index-0004/_search
+{
+  "query": {
+    "term": {
+      "attrs": {
+        "value": "thunder"
+      }
+    }
+  }
+}
+
+如果要精确匹配，就需要增加count字段，再联合查询
+POST my-index-0004/_update/1
+{
+  "doc":{
+    "attr_count": 1
+  }
+}
+
+POST my-index-0004/_update/2
+{
+  "doc":{
+    "attr_count": 3
+  }
+}
+
+POST my-index-0004/_search
+{
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "term": {
+            "attrs": {
+              "value": "thunder"
+            }
+          }
+        },
+        {
+          "term": {
+            "attr_count": {
+              "value": 1
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
+#bool查询可以嵌套
