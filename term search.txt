@@ -15,11 +15,11 @@ PUT products
 
 POST products/_bulk
 { "index": {"_id":1} }
-{ "productID":"ASDF-GHJK-LPOI", "desc":"Huawei"}
+{ "productID":"ASDF-GHJK-LPOI", "desc":"Huawei", "price":3000, "date":"2015-01-13 14:00:00"}
 { "index": {"_id":2} }
-{ "productID":"ASDF-GHJK-LPOI", "desc":"iPhone"}
+{ "productID":"ASDF-GHJK-LPOI", "desc":"iPhone", "price":4000, "date":"2013-02-22 12:00:00"}
 { "index": {"_id":3} }
-{ "productID":"ASDF-GHJK-LPOI", "desc":"Samsung"}
+{ "productID":"ASDF-GHJK-LPOI", "desc":"Samsung", "price":4000}
 
 GET /products
 
@@ -60,6 +60,25 @@ POST products/_search
     }
   }
 }
+
+而下面却可以查询到，因为包含了asdf这个分词
+POST products/_search
+{
+  "query": {
+    "term": {
+      "productID": {
+        "value": "asdf"
+      }
+    }
+  }
+}
+
+GET _analyze
+{
+  "analyzer": "standard",
+  "text": "ASDF-GHJK-LPOI"
+}
+可以看到输入分词为 asdf、ghjk、lpoi三个
 
 该例子说明term查询对于输入是不分词的，而批量加入的产品信息默认是用stadard analizer分词了。
 
@@ -124,6 +143,40 @@ POST products/_search
 }
 
 6. term查询对输入不分词，但前面用过的match查询、match phase查询是分词的。
+
+7. term 查询是包含，不是完全相等。针对多值字段查询要尤其注意。
+
+put my-index-0004/_doc/1
+{
+  "name": "pikachu",
+  "attrs": [
+    "thunder"
+  ] 
+}
+
+put my-index-0004/_doc/2
+{
+  "name": "yibu",
+  "attrs": [
+    "thunder",
+    "fire",
+    "water"
+  ] 
+}
+
+下面的查询实际会把上面两条记录都查询出来，因为term查询是包含而不是相等
+POST my-index-0004/_search
+{
+  "query": {
+    "term": {
+      "attrs": {
+        "value": "thunder"
+      }
+    }
+  }
+}
+
+
 
 ## 相关阅读
 - https://www.elastic.co/guide/en/elasticsearch/reference/7.1/term-level-queries.html

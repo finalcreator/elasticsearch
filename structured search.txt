@@ -11,16 +11,88 @@ ES中的结构化搜索：
 ● 结构化的⽂本可以做精确匹配或者部分匹配： Term 查询 / Prefix 前缀查询
 ● 结构化结果只有“是”或“否”两个值，根据场景需要，可以决定结构化搜索是否需要打分(使用Constant Score)。
 
-
-3. exists
+2.  range
 POST products/_search
 {
-  "query":{
-    "exists": {
-      "field": "productID"
+  "query": {
+    "range": {
+      "price": {
+        "gte": 2000,
+        "lte": 3000
+      }
     }
   }
 }
 
+POST products/_search
+{
+  "query": {
+    "range": {
+      "date": {
+        "lte": "now-1y"
+      }
+    }
+  }
+}
+
+y 年
+M 月
+w 周
+d 天
+H / h 小时
+m 分钟
+s 秒
+
+3. 处理空值
+查询存在date字段的产品
+POST products/_search
+{
+  "query":{
+    "exists": {
+      "field": "date"
+    }
+  }
+}
+
+查询不存在date字段的产品
+POST products/_search
+{
+  "query": {
+    "bool": {
+      "must_not": {
+        "exists": {
+          "field":"date"
+        }
+      }
+    }
+  }
+}
+
+4. 多个精确值查询
+
+匹配一个即可查到，注意是terms而不是term：
+POST products/_search
+{
+  "query": {
+    "terms": {
+      "price": [
+        3000,
+        4000
+      ]
+    }
+  }
+}
+
+POST products/_search
+{
+  "query": {
+    "terms": {
+      "productID.keyword": [
+        "ASDF-GHJK-LPOI",
+        "CVBN"
+      ]
+    }
+  }
+}
 
 参考： https://www.elastic.co/guide/en/elasticsearch/reference/current/term-level-queries.html
