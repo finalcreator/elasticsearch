@@ -138,5 +138,4 @@ POST my-index-0004/_search
     }
   }
 }
-
 #bool查询可以嵌套

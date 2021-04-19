@@ -1,0 +1,77 @@
+# 单字符串多字段查询：Dis Max Query
+# Returns documents matching one or more wrapped queries, called query clauses or clauses.
+# If a returned document matches multiple query clauses, the dis_max query 
+# assigns the document the highest relevance score from any matching clause, 
+# plus a tie breaking increment for any additional matching subqueries.
+# You can use the dis_max to search for a term in fields mapped with different boost factors
+
+PUT /blogs/_doc/1
+{
+    "title": "Quick brown rabbits",
+    "body":  "Brown rabbits are commonly seen."
+}
+
+PUT /blogs/_doc/2
+{
+    "title": "Keeping pets healthy",
+    "body":  "My quick brown fox eats rabbits on a regular basis."
+}
+
+因为1，title和body里都有brown，而bool查询的should算分会根据各个字段的匹配简单叠加算平均分，
+虽然2里更匹配brown fox, 但是1的score会更高
+POST /blogs/_search
+{
+    "query": {
+        "bool": {
+            "should": [
+                { "match": { "title": "Brown fox" }},
+                { "match": { "body":  "Brown fox" }}
+            ]
+        }
+    }
+}
+
+使用了dis_max，默认tie_break是0, 是以最高的那次匹配的评分作为排序依据,
+这样2body里满足brown fox, 而1虽然title里满足brown, body里满足brown，但只会取一个最高的，所以score会比2低
+POST blogs/_search
+{
+    "query": {
+        "dis_max": {
+            "queries": [
+                { "match": { "title": "Brown fox" }},
+                { "match": { "body":  "Brown fox" }}
+            ]
+        }
+    }
+}
+
+为什么下面score一样？因为都只取最高分
+POST blogs/_search
+{
+    "query": {
+        "dis_max": {
+            "queries": [
+                { "match": { "title": "Quick pets" }},
+                { "match": { "body":  "Quick pets" }}
+            ]
+        }
+    }
+}
+
+因为默认tie_breaker为0，只取最高分，这样就会忽略其它分数的贡献。
+tie_breaker可以增加其它相关度做出的贡献。
+POST blogs/_search
+{
+    "query": {
+        "dis_max": {
+            "queries": [
+                { "match": { "title": "Quick pets" }},
+                { "match": { "body":  "Quick pets" }}
+            ],
+            "tie_breaker": 0.2
+        }
+    }
+}
+
+## 相关阅读
+- https://www.elastic.co/guide/en/elasticsearch/reference/7.1/query-dsl-dis-max-query.html

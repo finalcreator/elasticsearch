@@ -1,8 +1,11 @@
+1. 聚合是什么？
 #Elasticsearch aggregations enable you to get meta-information about your search results and 
 #answer questions like, "How many account holders are in Texas?" or "What’s the average balance of 
 #accounts in Tennessee?" You can search documents, filter hits, and use aggregations to analyze 
 #the results all in one request.
+所以，聚合其实就是分组、计数、求最大值、最小值等等，类比关系型数据库的group by, count, sum等等
 
+2. 简单例子
 #uses a terms aggregation to group all of the accounts in the bank index by state, 
 #and returns the ten states with the most accounts in descending order
 GET /bank/_search
@@ -32,6 +35,7 @@ GET /bank/_search
   }
 }
 
+聚合可以嵌套
 # the following request nests an avg aggregation within the previous group_by_state aggregation 
 # to calculate the average account balances for each state.
 # that is, group by state and calcute each group's average account balance
