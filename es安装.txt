@@ -1,5 +1,6 @@
 一. 安装参考：
 https://www.elastic.co/guide/en/elastic-stack-get-started/current/get-started-elastic-stack.html
+./bin/elasticsearch -d启动es, -d表示在后台启动。
 
 二. 启动常见报错：
 1.max virtual memory areas vm.max_map_count [65530] is too low, increase to at least [262144]
@@ -18,6 +19,32 @@ vim config/elasticsearch.yml
 #添加配置
 discovery.seed_hosts: ["127.0.0.1"]
 cluster.initial_master_nodes: ["node-1"]
+单机有时候需要设置
+node.name: node-1
+node.master: true
+
+3. max number of threads [1024] for user [lish] likely too low, increase to at least [2048]
+# cat /etc/security/limits.d/90-nproc.conf 
+# Default limit for number of user's processes to prevent
+# accidental fork bombs.
+# See rhbz #432903 for reasoning.
+
+*          soft    nproc     2048
+root       soft    nproc     unlimited
+#在这里修改
+
+4. es为了安全，不允许root用户启动
+groupadd es
+useradd es -g es -p password # -g 指定组 -p 指定密码
+chown -R es:es  elasticsearch-7.11.2/ # -R : 处理指定目录下的所有文件
+
+5. es:ccomp unavailable: CONFIG_SECCOMP not compiled into kernel, CONFIG_SECCOMP and CONFIG_SEC
+在es 的config配置文件，elasticsearch.yml里面，追加或修改两行。问题即可解决。
+bootstrap.memory_lock: false
+bootstrap.system_call_filter: false
+
+su es
+./bin/elasticsearch
 
 三. 如果需要外部访问（非本机访问）,需要修改配置文件。
 es:
@@ -34,3 +61,12 @@ kill 进程
 
 五. 9200是es对外的默认端口号，暴露restful接口，
 9300是es集群之间通讯默认的端口号（外部无法访问）
+
+六. kibana安装遇到的问题
+1.  'GLIBC_2.XX' not found .... 
+需要到 http://mirrors.syringanetworks.net/gnu/libc/ 下载对应的包进行安装(http://www.gnu.org/software/libc/)
+参考：https://blog.csdn.net/xinjing2015/article/details/93746179
+https://www.cnblogs.com/wangsongbai/p/10844152.html
+
+2. GLIBCXX_3.4.14 not found
+https://blog.csdn.net/officercat/article/details/39519265
