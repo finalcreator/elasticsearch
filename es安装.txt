@@ -37,14 +37,28 @@ root       soft    nproc     unlimited
 groupadd es
 useradd es -g es -p password # -g 指定组 -p 指定密码
 chown -R es:es  elasticsearch-7.11.2/ # -R : 处理指定目录下的所有文件
+su es
+./bin/elasticsearch
 
 5. es:ccomp unavailable: CONFIG_SECCOMP not compiled into kernel, CONFIG_SECCOMP and CONFIG_SEC
 在es 的config配置文件，elasticsearch.yml里面，追加或修改两行。问题即可解决。
 bootstrap.memory_lock: false
 bootstrap.system_call_filter: false
 
-su es
-./bin/elasticsearch
+6. max file descriptors [65535] for elasticsearch process is too low
+解决办法：
+
+#切换到root用户修改
+
+vim /etc/security/limits.conf
+
+# 在最后面追加下面内容
+
+*** hard nofile 65536
+ 
+*** soft nofile 65536
+***  是启动ES的用户
+
 
 三. 如果需要外部访问（非本机访问）,需要修改配置文件。
 es:
