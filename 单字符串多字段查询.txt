@@ -124,26 +124,6 @@ POST blogs/_search
 
 2) most fields query
 DELETE /titles
-PUT /titles
-{
-    "settings": { "number_of_shards": 1 },
-    "mappings": {
-        "my_type": {
-            "properties": {
-                "title": {
-                    "type":     "string",
-                    "analyzer": "english",
-                    "fields": {
-                        "std":   {
-                            "type":     "string",
-                            "analyzer": "standard"
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
 PUT /titles
 {
@@ -172,6 +152,97 @@ GET titles/_search
     }
   }
 }
+上面的查询，第一条算分会比第二条高，但实际上第二条包含了barking dogs,算分应该更高才对。
+为什么呢？
+因为是英文分词器，barking dogs会被分词为bark和dogs，这样第一条反而更匹配了。standard分词器会保留barking.
+GET _analyze
+{
+  "analyzer": "english",
+  "text": "Master Es, the Beats, the Kibana, barking dogs"
+}
+
+为了解决上述问题，我们可以做如下配置，并使用most_fields模式。
+DELETE /titles
+PUT /titles
+{
+  "mappings": {
+    "properties": {
+      "title": {
+        "type": "text",
+        "analyzer": "english",
+        "fields": {"std": {"type": "text","analyzer": "standard"}}
+      }
+    }
+  }
+}
+这样相当于在字段里又加了个std字段，而std字段用的是standard分词器，如此一来，
+使用most_fields模式时，就能拿到更高的分。
+
+POST titles/_bulk
+{ "index": { "_id": 1 }}
+{ "title": "My dog barks" }
+{ "index": { "_id": 2 }}
+{ "title": "I see a lot of barking dogs on the road " }
+
+GET /titles/_search
+{
+   "query": {
+        "multi_match": {
+            "query":  "barking dogs",
+            "type":   "most_fields",
+            "fields": [ "title", "title.std" ]
+        }
+    }
+}
+
+GET /titles/_search
+{
+   "query": {
+        "multi_match": {
+            "query":  "barking dogs",
+            "type":   "most_fields",
+            "fields": [ "title^10", "title.std" ]
+        }
+    }
+}
+title^10设置了title权重更高。
+
+3) Cross Field query
+
+DELETE address
+
+PUT address/_doc/1
+{
+  "street": "5 Poland Street",
+  "city": "London",
+  "country": "United Kindom",
+  "postcode": "W1V 3DG"
+}
+
+POST address/_search
+{
+  "query": {
+    "multi_match": {
+      "type": "most_fields", 
+      "query": "Poland Street W1V",
+      "fields": ["street","city","country","postcode"]
+    }
+  }
+}
+#无法使用operator and
+
+POST address/_search
+{
+  "query": {
+    "multi_match": {
+      "type": "cross_fields",
+      "operator": "and", 
+      "query": "Poland Street W1V",
+      "fields": ["street","city","country","postcode"]
+    }
+  }
+}
+# copy_to, 相⽐，其中⼀个优势就是它可以在搜索时为单个字段提升权重。另外是 copy_to 需要额外的存储空间
 
 
 3. 关于minimum_should_match的一些理解
