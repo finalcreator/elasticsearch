@@ -1,4 +1,5 @@
-# 单字符串多字段查询：Dis Max Query
+# 单字符串多字段查询：
+# 1. Dis Max Query
 # Returns documents matching one or more wrapped queries, called query clauses or clauses.
 # If a returned document matches multiple query clauses, the dis_max query 
 # assigns the document the highest relevance score from any matching clause, 
@@ -75,3 +76,128 @@ POST blogs/_search
 
 ## 相关阅读
 - https://www.elastic.co/guide/en/elasticsearch/reference/7.1/query-dsl-dis-max-query.html
+
+
+# 2. multi_match query
+有3种模式：
+● 最佳字段 (Best Fields)
+  当字段之间相互竞争，⼜相互关联。例如 title 和 body 这样的字段。评分来⾃最匹配字段。
+这也是默认的模式。
+● 多数字段 (Most Fields)
+  处理英⽂内容时：⼀种常⻅的⼿段是，在主字段( English Analyzer)，抽取词⼲，加⼊同义词，以
+匹配更多的⽂档。相同的⽂本，加⼊⼦字段(Standard Analyzer)，以提供更加精确的匹配。其他字
+段作为匹配⽂档提⾼相关度的信号。匹配的字段越多则越好。
+● 混合字段 (Cross Field)
+  “跨字段”，对于某些实体，例如⼈名，地址，图书信息。需要在多个字段中确定信息，单个字段只能作为整体
+的⼀部分。希望在任何这些列出的字段中找到尽可能多的词。的、
+
+1) best fields 类似于 上面的dis_max query
+POST blogs/_search
+{
+  "query": {
+    "multi_match": {
+      "type": "best_fields",
+      "query": "Quick pets",
+      "fields": ["title","body"],
+      "tie_breaker": 0.2,
+      "minimum_should_match": "20%"
+    }
+  }
+}
+
+#可以指定查询某些field，通配符、数组
+POST blogs/_search
+{
+    "multi_match": {
+        "query":  "Quick brown fox",
+        "fields": "*title"
+    }
+}
+
+POST blogs/_search
+{
+    "multi_match": {
+        "query":  "Quick brown fox",
+        "fields": [ "*_title", "chapter_title^2" ]
+    }
+}
+
+2) most fields query
+DELETE /titles
+PUT /titles
+{
+    "settings": { "number_of_shards": 1 },
+    "mappings": {
+        "my_type": {
+            "properties": {
+                "title": {
+                    "type":     "string",
+                    "analyzer": "english",
+                    "fields": {
+                        "std":   {
+                            "type":     "string",
+                            "analyzer": "standard"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+PUT /titles
+{
+  "mappings": {
+    "properties": {
+      "title": {
+        "type": "text",
+        "analyzer": "english"
+      }
+    }
+  }
+}
+
+POST titles/_bulk
+{ "index": { "_id": 1 }}
+{ "title": "My dog barks" }
+{ "index": { "_id": 2 }}
+{ "title": "I see a lot of barking dogs on the road " }
+
+
+GET titles/_search
+{
+  "query": {
+    "match": {
+      "title": "barking dogs"
+    }
+  }
+}
+
+
+3. 关于minimum_should_match的一些理解
+elasticsearch query中的minimum_should_match ，字面意思就很清晰了，就是最小匹配度，但是它却有很多种配置方式。
+正向匹配度比如 "minimum_should_match":3 官方原文解释是：
+Indicates a fixed value regardless of the number of optional clauses.
+为什么是optional clauses（翻译为可选的子句），
+因为对于被analyzer分解出来的每一个term都会构造成一个should的bool query的查询,
+每个term变成一个term query子句。
+例如"query": "how not to be"，被解析成：
+{
+  "bool": {
+    "should": [
+      { "term": { "body": "how"}},
+      { "term": { "body": "not"}},
+      { "term": { "body": "to"}},
+      { "term": { "body": "be"}}
+    ],
+    "minimum_should_match": 3
+  }
+}
+注：在bool query中minimum_should_match只能紧跟在should的后面，放其他地方会出异常。
+
+或者 "minimum_should_match":75%，可以配置一个一个百分比，至少optional clauses至少满足75%，
+这里是向下取整的。比如有5个clause,5*75%=3.75,向下取整为3，也就是至少需要match 3个clause。
+例外：如果只有2个clause, minimum_should_match=20%, 2 * 20% 向下取整为0，但至少满足1个。
+
+逆向匹配和正向匹配相反，比如我们可以近似理解为-25%和75%表示的是一个意思，但是有些小小的差异，
+比如有5个clause，逆向匹配-25%，5*25%=1.25，取整是1,5-1=4，即要匹配4个clause，而75%算出来是3个clause。

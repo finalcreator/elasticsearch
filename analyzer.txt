@@ -73,6 +73,14 @@ POST my-index-000002/_analyze
   "text": "You know, Elasticsearch, kibana"
 }
 
+例4：
+GET _analyze
+{
+  "analyzer": "english",
+  "text": "Master Es, the Beats, the Kibana"
+}
+使用英文分词器，会过滤掉stop word, 比如the、a、is, 并转为小写。
+
 
 5. 中文分词器
 ik-analyzer
