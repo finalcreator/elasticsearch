@@ -1,0 +1,48 @@
+第一：Elasticsearch没有专门的数组类型，这和我们学编程语言的认知不同的。比如：java中的array、list等都算作数组类型。
+第二：任何类型都可以成为数组类型，前提：一个数组的包含元素是相同类型。
+• 第五步：进一步定位Arrays详细介绍部分
+https://www.elastic.co/guide/en/elasticsearch/reference/7.2/array.html
+主要描述数组类型到底张什么样？
+an array of strings: [ "one", "two" ]
+an array of integers: [ 1, 2 ]
+an array of arrays: [ 1, [ 2, 3 ]] which is the equivalent of [ 1, 2, 3 ]
+an array of objects: [ { "name": "Mary", "age": 12 }, { "name": "John", "age": 10 }]
+
+一个例子：
+
+DELETE my_index
+
+PUT my_index/_doc/1
+{
+  "message": "some arrays in this document...",
+  "tags":  [ "elasticsearch", "wow" ], 
+  "lists": [ 
+    {
+      "name": "prog_list",
+      "description": "programming list"
+    },
+    {
+      "name": "cool_list",
+      "description": "cool stuff list"
+    }
+  ]
+}
+
+PUT my_index/_doc/2 
+{
+  "message": "no arrays in this document...",
+  "tags":  "elasticsearch",
+  "lists": {
+    "name": "prog_list",
+    "description": "programming list"
+  }
+}
+
+GET my_index/_search
+{
+  "query": {
+    "match": {
+      "tags": "elasticsearch" 
+    }
+  }
+}
