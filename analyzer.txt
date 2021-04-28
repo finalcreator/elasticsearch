@@ -83,6 +83,29 @@ GET _analyze
 
 
 5. 中文分词器
-ik-analyzer
-icu-analyzer
-thulac
+• IK分词
+https://github.com/medcl/elasticsearch-analysis-ik
+• ANSJ分词
+https://github.com/NLPchina/elasticsearch-analysis-ansj
+• 结巴分词
+https://github.com/sing1ee/elasticsearch-jieba-plugin
+• hanlp分词
+https://github.com/KennFalcon/elasticsearch-analysis-hanlp
+• 清华大学THULAC分词
+https://github.com/microbun/elasticsearch-thulac-plugin
+• 斯坦福分词
+https://github.com/stanfordnlp/CoreNLP
+• 哈工大分词
+https://github.com/HIT-SCIR/ltp
+
+在这里建议选用 IK 分词，原因有以下几点：
+• 1、IK 分细粒度 ikmaxword 和粗粒度 ik_smart 两种分词方式。
+• 2、IK 更新字典只需要在词典末尾添加关键词即可，支持本地和远程词典两种方式。
+• 3、IK 分词插件由Elastic中国首位员工，Elastic中文社区创始人medcl集成开发，的更新速度更快，和最新版本保持高度一致。
+IK选型注意：
+• 1、IK自带词典并不完备，建议自己结合业务添加所属业务的词典。
+• 2、IK动态添加词典的方式，建议修改ik源码和mysql数据库结合，以灵活支持动态词典的更新。
+
+6. 参考资料
+https://www.elastic.co/guide/en/elasticsearch/reference/7.2/analysis.html
+https://www.elastic.co/guide/en/elasticsearch/reference/7.2/analysis-custom-analyzer.html
