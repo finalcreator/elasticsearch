@@ -1,0 +1,102 @@
+1. Term Suggester
+
+DELETE articles
+
+POST articles/_bulk
+{ "index" : { } }
+{ "body": "lucene is very cool"}
+{ "index" : { } }
+{ "body": "Elasticsearch builds on top of lucene"}
+{ "index" : { } }
+{ "body": "Elasticsearch rocks"}
+{ "index" : { } }
+{ "body": "elastic is the company behind ELK stack"}
+{ "index" : { } }
+{ "body": "Elk stack rocks"}
+{ "index" : {} }
+{  "body": "elasticsearch is rock solid"}
+
+POST articles/_search
+{
+  "query": {
+    "match_all": {}
+  }
+}
+
+# 对于stadard分词器， rocks和rock是两个分词；如果是english分词器，那么rocks会变为rock
+POST _analyze
+{
+  "analyzer": "standard",
+  "text": ["Elk stack  rocks rock"]
+}
+
+POST /articles/_search
+{
+  "size": 1,
+  "query": {
+    "match": {
+      "body": "lucen rock"
+    }
+  },
+  "suggest": {
+    "term-suggestion": {
+      "text": "lucen rock",
+      "term": {
+        "suggest_mode": "missing",
+        "field": "body"
+      }
+    }
+  }
+}
+
+⼏种 Suggestion Mode
+● Missing – 如索引中已经存在，就不提供建议。例如上面例子中，“lucen”单词错误，索引中不存在，就给予提示；而rock存在，就不给予提示。
+● Popular – 推荐出现频率更加⾼的词
+● Always – ⽆论是否存在，都提供建议
+
+
+# popular mode可以搜出rocks，因为rocks出现频率高
+POST /articles/_search
+{
+  "suggest": {
+    "term-suggestion": {
+      "text": "lucen rock",
+      "term": {
+        "suggest_mode": "popular",
+        "field": "body"
+      }
+    }
+  }
+}
+
+
+POST /articles/_search
+{
+  "suggest": {
+    "term-suggestion": {
+      "text": "lucen rock",
+      "term": {
+        "suggest_mode": "always",
+        "field": "body"
+      }
+    }
+  }
+}
+
+#默认按照 score 排序，也可以按照“frequency”
+#默认⾸字⺟不⼀致就不会匹配推荐，但是如果将 prefix_length 设置为 0，就会为 hock 建议 rock
+POST /articles/_search
+{
+
+  "suggest": {
+    "term-suggestion": {
+      "text": "lucen hocks",
+      "term": {
+        "suggest_mode": "always",
+        "field": "body",
+        "prefix_length":0,
+        "sort": "frequency"
+      }
+    }
+  }
+}
