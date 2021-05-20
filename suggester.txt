@@ -284,3 +284,11 @@ POST comments/_search
   }
 }
 这时候只会查询出星巴克，而不会查询出星球大战。
+
+5. 几种suggester精准度、召回率、性能对比
+● 精准度
+● Completion > Phrase > Term
+● 召回率
+● Term > Phrase > Completion
+● 性能
+● Completion > Phrase > Term
