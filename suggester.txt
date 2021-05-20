@@ -1,3 +1,9 @@
+搜索引擎中类似的功能，在 Elasticsearch 中是通过 Suggester API 实现的
+● 原理：将输⼊的⽂本分解为 Token，然后在索引的字典⾥查找相似的 Term 并返回
+● 根据不同的使⽤场景，Elasticsearch 设计了 4 种类别的 Suggesters
+● Term & Phrase Suggester
+● Complete & Context Suggeste
+
 1. Term Suggester
 
 DELETE articles
@@ -100,3 +106,181 @@ POST /articles/_search
     }
   }
 }
+
+2. phrase suggester
+
+Phrase Suggester 在 Term Suggester 上增加了⼀
+些额外的逻辑
+● ⼀些参数
+● Suggest Mode ：missing, popular, always
+● Max Errors：最多可以拼错的 Terms 数
+● Confidence：限制返回结果数，默认为 1,  0则表示不限制
+
+POST /articles/_search
+{
+  "suggest": {
+    "my-suggestion": {
+      "text": "lucne and elasticsear rock hello world",
+      "phrase": {
+        "field": "body",
+        "max_errors":2,
+        "confidence":0,
+        "direct_generator":[{
+          "field":"body",
+          "suggest_mode":"always"
+        }],
+        "highlight": {
+          "pre_tag": "<em>",
+          "post_tag": "</em>"
+        }
+      }
+    }
+  }
+}
+
+3. completion suggester
+Completion Suggester 提供了“⾃动完成” (Auto Complete) 的功能。⽤户每输⼊⼀个
+字符，就需要即时发送⼀个查询请求到后端查找匹配项。
+● 对性能要求⽐较苛刻。Elasticsearch 采⽤了不同的数据结构，并⾮通过倒排索引来完成。
+⽽是将 Analyze 的数据编码成 FST 和索引⼀起存放。FST 会被 ES 整个加载进内存，
+速度很快。
+● FST 只能⽤于前缀查。
+DELETE articles
+PUT articles
+{
+  "mappings": {
+    "properties": {
+      "title_completion":{
+        "type": "completion"
+      }
+    }
+  }
+}
+
+POST articles/_bulk
+{ "index" : { } }
+{ "title_completion": "lucene is very cool"}
+{ "index" : { } }
+{ "title_completion": "Elasticsearch builds on top of lucene"}
+{ "index" : { } }
+{ "title_completion": "Elasticsearch rocks"}
+{ "index" : { } }
+{ "title_completion": "elastic is the company behind ELK stack"}
+{ "index" : { } }
+{ "title_completion": "Elk stack rocks"}
+{ "index" : {} }
+
+
+POST articles/_search?pretty
+{
+  "size": 0,
+  "suggest": {
+    "article-suggester": {
+      "prefix": "elk ",
+      "completion": {
+        "field": "title_completion"
+      }
+    }
+  }
+}
+
+
+4. Context Suggester
+● Completion Suggester 的扩展
+● 可以在搜索中加⼊更多的上下⽂信息，例如，输⼊ “star”
+● 咖啡相关：建议 “Starbucks”
+● 电影相关：建议 “star wars”
+
+DELETE articles
+PUT articles
+{
+  "mappings": {
+    "properties": {
+      "title_completion":{
+        "type": "completion"
+      }
+    }
+  }
+}
+
+POST articles/_bulk
+{ "index" : { } }
+{ "title_completion": "lucene is very cool"}
+{ "index" : { } }
+{ "title_completion": "Elasticsearch builds on top of lucene"}
+{ "index" : { } }
+{ "title_completion": "Elasticsearch rocks"}
+{ "index" : { } }
+{ "title_completion": "elastic is the company behind ELK stack"}
+{ "index" : { } }
+{ "title_completion": "Elk stack rocks"}
+{ "index" : {} }
+
+
+POST articles/_search?pretty
+{
+  "size": 0,
+  "suggest": {
+    "article-suggester": {
+      "prefix": "elk ",
+      "completion": {
+        "field": "title_completion"
+      }
+    }
+  }
+}
+
+
+DELETE comments
+PUT comments
+PUT comments/_mapping
+{
+  "properties": {
+    "comment_autocomplete":{
+      "type": "completion",
+      "contexts":[{
+        "type":"category",
+        "name":"comment_category"
+      }]
+    }
+  }
+}
+
+POST comments/_doc
+{
+  "comment":"I love the star war movies",
+  "comment_autocomplete":{
+    "input":["star wars"],
+    "contexts":{
+      "comment_category":"movies"
+    }
+  }
+}
+
+POST comments/_doc
+{
+  "comment":"Where can I find a Starbucks",
+  "comment_autocomplete":{
+    "input":["starbucks"],
+    "contexts":{
+      "comment_category":"coffee"
+    }
+  }
+}
+
+
+POST comments/_search
+{
+  "suggest": {
+    "MY_SUGGESTION": {
+      "prefix": "sta",
+      "completion":{
+        "field":"comment_autocomplete",
+        "contexts":{
+          "comment_category":"coffee"
+        }
+      }
+    }
+  }
+}
+这时候只会查询出星巴克，而不会查询出星球大战。
