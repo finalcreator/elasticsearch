@@ -1,0 +1,176 @@
+1. 分页基础
+ES 天⽣就是分布式的。查询信息，但是数据分别保存在多个分⽚，多台机器上，
+ES天⽣就需要满⾜排序的需要（按照相关性算分）
+● 当⼀个查询： From = 990， Size =10
+● 会在每个分⽚上先都获取 1000 个⽂档。然后，
+通过 Coordinating Node 聚合所有结果。最后
+再通过排序选取前 1000 个⽂档。
+● ⻚数越深，占⽤内存越多。为了避免深度分⻚带
+来的内存开销。ES 有⼀个设定，默认限定到
+10000 个⽂档。即from + size >= 10000将报错，因此又提供了Search After API、Scroll API。
+
+2. from size 基本使用
+POST my-index-000001/_search
+{
+  "query": {
+    "match_all": {}
+  },
+  "size": 10000,
+  "from": 1
+}
+>=10000报错
+
+# size可以和sort一起使用
+POST users/_search
+{
+    "size": 1,
+    "query": {
+        "match_all": {}
+    },
+    "sort": [
+        {"age": "desc"} ,
+        {"_id": "asc"}    
+    ]
+}
+#! Deprecation: Loading the fielddata on the _id field is deprecated and will be removed in future versions.
+# If you require sorting or aggregating on this field you should also include the id in the body of your documents, 
+# and map this field as a keyword field that has [doc_values] enabled
+也就是说，_id未来会被移除，排序和聚合操作时，建议自己添加id字段，设置为keyword类型，并打开doc_values
+
+3. Search After API
+避免深度分⻚的性能问题，可以实时获取下⼀⻚⽂
+档信息
+● 不⽀持指定⻚数（From）
+● 只能往下翻
+● 第⼀步搜索需要指定 sort，并且保证值是唯⼀的
+（可以通过加⼊ _id 保证唯⼀性）
+● 然后使⽤上⼀次，最后⼀个⽂档的 sort 值进⾏查询
+
+POST users/_search
+{
+    "size": 1,
+    "query": {
+        "match_all": {}
+    },
+    "sort": [
+        {"age": "desc"} ,
+        {"_id": "asc"}    
+    ]
+}
+
+返回结果:
+{
+    "took" : 0,
+    "timed_out" : false,
+    "_shards" : {
+      "total" : 1,
+      "successful" : 1,
+      "skipped" : 0,
+      "failed" : 0
+    },
+    "hits" : {
+      "total" : {
+        "value" : 6,
+        "relation" : "eq"
+      },
+      "max_score" : null,
+      "hits" : [
+        {
+          "_index" : "users",
+          "_type" : "_doc",
+          "_id" : "g0mqsHkBWuwxqfb5jw95",
+          "_score" : null,
+          "_source" : {
+            "name" : "user2",
+            "age" : 13
+          },
+          "sort" : [
+            13,
+            "g0mqsHkBWuwxqfb5jw95"
+          ]
+        }
+      ]
+    }
+  }
+
+  找到sort的返回值
+  [
+    13,
+    "g0mqsHkBWuwxqfb5jw95"
+  ]
+  放到后面search after里：
+
+POST users/_search
+{
+    "size": 1,
+    "query": {
+        "match_all": {}
+    },
+    "search_after":
+    [
+        13,
+        "g0mqsHkBWuwxqfb5jw95"
+      ],
+    "sort": [
+        {"age": "desc"} ,
+        {"_id": "asc"}    
+    ]
+}
+
+Search after如何解决深度分页问题的？
+假定 Size 是 10
+● 当查询 990 – 1000
+● 通过唯⼀排序值定位（比如上面例子中的_id），将每次要处理的⽂档数都控制在 10
+
+3. Scroll API
+● 创建⼀个快照，有新的数据写⼊以后，⽆
+法被查到
+● 每次查询后，输⼊上⼀次的 Scroll Id
+DELETE users
+
+POST users/_doc
+{"name":"user1","age":10}
+
+POST users/_doc
+{"name":"user2","age":20}
+
+POST users/_doc
+{"name":"user3","age":30}
+
+POST users/_doc
+{"name":"user4","age":40}
+
+# scroll=5m表示设置scroll_id保留5分钟可用
+POST /users/_search?scroll=5m
+{
+    "size": 1,
+    "query": {
+        "match_all" : {
+        }
+    }
+}
+会返回一个scroll_id,然后可用于下面查询
+
+POST users/_doc
+{"name":"user5","age":50}
+POST /_search/scroll
+{
+    "scroll" : "1m",
+    "scroll_id" : "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAAAWAWbWdoQXR2d3ZUd2kzSThwVTh4bVE0QQ=="
+}
+
+4. 总结：
+Elasticsearch 默认返回 10 个结果
+● 为了获取更多的结果，提供 3 种⽅式解决分⻚与遍历
+● From / Size 的⽤法，深度分⻚所存在的问题
+● Search After 解决深度分⻚的问题
+● Scroll API，通过快照，遍历数据
+
+不同的搜索类型和使⽤场景
+● Regular
+● 需要实时获取顶部的部分⽂档。例如查询最新的订单
+● Scroll
+● 需要全部⽂档，例如导出全部数据
+● Pagination
+● From 和 Size
+● 如果需要深度分⻚，则选⽤ Search After
