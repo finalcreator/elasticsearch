@@ -1,0 +1,77 @@
+1. 并发控制的必要性
+两个 Web 程序同时更新某个⽂档，如果缺
+乏有效的并发，会导致更改的数据丢失
+● 悲观并发控制
+● 假定有变更冲突的可能。会对资源加锁，防
+⽌冲突。例如数据库⾏锁
+● 乐观并发控制
+● 假定冲突是不会发⽣的，不会阻塞正在尝试
+的操作。如果数据在读写中被修改，更新将
+会失败。应⽤程序决定如何解决冲突，例如
+重试更新，使⽤新的数据，或者将错误报告
+给⽤户
+
+2. ES 采⽤的是乐观并发控制
+ES 中的⽂档是不可变更的。如果你更新⼀个⽂档，会将
+就⽂档标记为删除，同时增加⼀个全新的⽂档。同时⽂档
+的 version 字段加 1
+● 内部版本控制
+  If_seq_no + If_primary_term
+● 使⽤外部版本(使⽤其他数据库作为主要数据存储)
+  version + version_type=external
+
+DELETE products
+PUT products
+
+PUT products/_doc/1
+{
+  "title":"iphone",
+  "count":100
+}
+
+
+
+GET products/_doc/1
+结果：
+{
+    "_index" : "products",
+    "_type" : "_doc",
+    "_id" : "1",
+    "_version" : 1,
+    "_seq_no" : 0,
+    "_primary_term" : 1,
+    "found" : true,
+    "_source" : {
+        "title" : "iphone",
+        "count" : 100
+    }
+}
+
+PUT products/_doc/1?if_seq_no=0&if_primary_term=1
+{
+  "title":"iphone",
+  "count":100
+}
+
+GET products/_doc/1
+结果：
+{
+    "_index" : "products",
+    "_type" : "_doc",
+    "_id" : "1",
+    "_version" : 1,
+    "_seq_no" : 1,
+    "_primary_term" : 1,
+    "found" : true,
+    "_source" : {
+      "title" : "iphone",
+      "count" : 100
+    }
+  }
+  
+
+PUT products/_doc/1?version=30000&version_type=external
+{
+  "title":"iphone",
+  "count":100
+}
