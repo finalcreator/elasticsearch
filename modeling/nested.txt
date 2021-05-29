@@ -1,0 +1,237 @@
+
+DELETE blog
+# 设置blog的 Mapping
+PUT /blog
+{
+  "mappings": {
+    "properties": {
+      "content": {
+        "type": "text"
+      },
+      "time": {
+        "type": "date"
+      },
+      "user": {
+        "properties": {
+          "city": {
+            "type": "text"
+          },
+          "userid": {
+            "type": "long"
+          },
+          "username": {
+            "type": "keyword"
+          }
+        }
+      }
+    }
+  }
+}
+
+
+# 插入一条 Blog 信息
+PUT blog/_doc/1
+{
+  "content":"I like Elasticsearch",
+  "time":"2019-01-01T00:00:00",
+  "user":{
+    "userid":1,
+    "username":"Jack",
+    "city":"Shanghai"
+  }
+}
+
+
+# 查询 Blog 信息, 满足content="Elasticsearch" && user.username="Jack"
+POST blog/_search
+{
+  "query": {
+    "bool": {
+      "must": [
+        {"match": {"content": "Elasticsearch"}},
+        {"match": {"user.username": "Jack"}}
+      ]
+    }
+  }
+}
+
+
+DELETE my_movies
+
+# 电影的Mapping信息
+PUT my_movies
+{
+      "mappings" : {
+      "properties" : {
+        "actors" : {
+          "properties" : {
+            "first_name" : {
+              "type" : "keyword"
+            },
+            "last_name" : {
+              "type" : "keyword"
+            }
+          }
+        },
+        "title" : {
+          "type" : "text",
+          "fields" : {
+            "keyword" : {
+              "type" : "keyword",
+              "ignore_above" : 256
+            }
+          }
+        }
+      }
+    }
+}
+
+
+# 写入一条电影信息
+POST my_movies/_doc/1
+{
+  "title":"Speed",
+  "actors":[
+    {
+      "first_name":"Keanu",
+      "last_name":"Reeves"
+    },
+
+    {
+      "first_name":"Dennis",
+      "last_name":"Hopper"
+    }
+
+  ]
+}
+
+# 查询电影信息
+POST my_movies/_search
+{
+  "query": {
+    "bool": {
+      "must": [
+        {"match": {"actors.first_name": "Keanu"}},
+        {"match": {"actors.last_name": "Hopper"}}
+      ]
+    }
+  }
+}
+可见，当actors为写入数组为数组的时候，firstName为第1条数据的，lastName为第2条数据的，
+但还是查出来了。那么为什么能查询到？
+● 存储时，内部对象的边界并没有考虑在内，JSON 格式被处理成扁平式键值对的结构
+● 当对多个字段进行查询时，导致了意外的搜索结果 
+这时候就需要使用Nested解决。
+
+DELETE my_movies
+# 创建 Nested 对象 Mapping, 关键在于指定"type": "nested"
+PUT my_movies
+{
+      "mappings" : {
+      "properties" : {
+        "actors" : {
+          "type": "nested",
+          "properties" : {
+            "first_name" : {"type" : "keyword"},
+            "last_name" : {"type" : "keyword"}
+          }},
+        "title" : {
+          "type" : "text",
+          "fields" : {"keyword":{"type":"keyword","ignore_above":256}}
+        }
+      }
+    }
+}
+
+
+POST my_movies/_doc/1
+{
+  "title":"Speed",
+  "actors":[
+    {
+      "first_name":"Keanu",
+      "last_name":"Reeves"
+    },
+
+    {
+      "first_name":"Dennis",
+      "last_name":"Hopper"
+    }
+
+  ]
+}
+
+# Nested 查询时要指定path为actors
+POST my_movies/_search
+{
+  "query": {
+    "bool": {
+      "must": [
+        {"match": {"title": "Speed"}},
+        {
+          "nested": {
+            "path": "actors",
+            "query": {
+              "bool": {
+                "must": [
+                  {"match": {
+                    "actors.first_name": "Keanu"
+                  }},
+
+                  {"match": {
+                    "actors.last_name": "Hopper"
+                  }}
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
+
+# Nested Aggregation
+POST my_movies/_search
+{
+  "size": 0,
+  "aggs": {
+    "actors": {
+      "nested": {
+        "path": "actors"
+      },
+      "aggs": {
+        "actor_name": {
+          "terms": {
+            "field": "actors.first_name",
+            "size": 10
+          }
+        }
+      }
+    }
+  }
+}
+
+
+# 普通 aggregation不工作
+POST my_movies/_search
+{
+  "size": 0,
+  "aggs": {
+    "NAME": {
+      "terms": {
+        "field": "actors.first_name",
+        "size": 10
+      }
+    }
+  }
+}
+
+总结：
+子文档关系适合大量更新的操作。比如blog里有评论信息，经常有大量的更新修改。
+嵌套对象适用于字段中有多值对象，同时需要查询。
+
+```
+## 相关阅读
+- https://www.elastic.co/guide/en/elasticsearch/reference/7.1/query-dsl-nested-query.html
