@@ -1,0 +1,177 @@
+1. 聚合分析求原理和精准度问题
+因为doc分布在不同的分片上，会从不同分片取top3, 再汇总后找到top3,这样就可能存在精准度问题。
+比如分片1上有A(6) B(4) C(4) D(3) , 分片2上有A(6) B(2) C(1) D(3)
+求top3, 分片1上是A(6) B(4) C(4)，分片2上是A(6) B(2) D(3)
+汇总后排序A（12）B(6) C(4) ， 实际却是C(3) + C(3) = C(6)，
+应该派C而不是D，这就引发了精准度问题。
+
+于是引入两个参数：
+doc_count_error_upper_bound：被遗漏的term分桶里面包含的文档有可能的最大值——千万注意“可能的最大值”！
+分片1中，取回的三个的最小的桶里面是4个。所以遗漏的最大的可能数值是4。同理，分片2中是2.
+注意是“可能最大”而不是“实际最大值”。
+在上面的例子中, doc_count_error_upper_bound = 4 + 2 = 6.
+sum_other_doc_count: 除了了返回结果 bucket 的 terms 以外，其他 terms 的⽂文档总数（总数-返回的总数）
+在上面的例子中，总数 = 分片1上的总数+分片2上的总数 = 17 + 12 = 29, 返回的总数 = 12 + 6 + 4 = 22,
+sum_other_doc_count = 29 - 22 = 7.
+
+2. 提高精准度
+
+调整 shard size ⼤⼩，降低 doc_count_error_upper_bound 来提升准确度
+○ 增加整体计算量，提⾼高了了准确度，但会降低相应时间
+● Shard Size 默认⼤⼩：shard size = size *1.5 +10
+
+提高shard_size，可以降低doc_count_error_upper_bound，提升准确性，比如上面top3问题，我们设置shard_size=4,
+那么每个分片实际会取top4，最后再汇总后取top3。
+size和shard_size的区别？
+size是把各个分片返回结果汇总后最终返回多少个buckt的数量。
+shard_size是每个bucket在一个shard上取回的bucket的总数。然后，每个shard上的结果，
+会在coordinate节点上在做一次汇总，返回总数。
+
+3. 例子
+直接从kibana导入提供的flight data: home -> add data -> sample data -> sample flight data
+DELETE my_flights
+PUT my_flights
+{
+  "settings": {
+    "number_of_shards": 20
+  },
+  "mappings" : {
+      "properties" : {
+        "AvgTicketPrice" : {
+          "type" : "float"
+        },
+        "Cancelled" : {
+          "type" : "boolean"
+        },
+        "Carrier" : {
+          "type" : "keyword"
+        },
+        "Dest" : {
+          "type" : "keyword"
+        },
+        "DestAirportID" : {
+          "type" : "keyword"
+        },
+        "DestCityName" : {
+          "type" : "keyword"
+        },
+        "DestCountry" : {
+          "type" : "keyword"
+        },
+        "DestLocation" : {
+          "type" : "geo_point"
+        },
+        "DestRegion" : {
+          "type" : "keyword"
+        },
+        "DestWeather" : {
+          "type" : "keyword"
+        },
+        "DistanceKilometers" : {
+          "type" : "float"
+        },
+        "DistanceMiles" : {
+          "type" : "float"
+        },
+        "FlightDelay" : {
+          "type" : "boolean"
+        },
+        "FlightDelayMin" : {
+          "type" : "integer"
+        },
+        "FlightDelayType" : {
+          "type" : "keyword"
+        },
+        "FlightNum" : {
+          "type" : "keyword"
+        },
+        "FlightTimeHour" : {
+          "type" : "keyword"
+        },
+        "FlightTimeMin" : {
+          "type" : "float"
+        },
+        "Origin" : {
+          "type" : "keyword"
+        },
+        "OriginAirportID" : {
+          "type" : "keyword"
+        },
+        "OriginCityName" : {
+          "type" : "keyword"
+        },
+        "OriginCountry" : {
+          "type" : "keyword"
+        },
+        "OriginLocation" : {
+          "type" : "geo_point"
+        },
+        "OriginRegion" : {
+          "type" : "keyword"
+        },
+        "OriginWeather" : {
+          "type" : "keyword"
+        },
+        "dayOfWeek" : {
+          "type" : "integer"
+        },
+        "timestamp" : {
+          "type" : "date"
+        }
+      }
+    }
+}
+
+#将kibana_sample_data_flights数据导入到我们自己的my_flights
+POST _reindex
+{
+  "source": {
+    "index": "kibana_sample_data_flights"
+  },
+  "dest": {
+    "index": "my_flights"
+  }
+}
+
+GET kibana_sample_data_flights/_count
+GET my_flights/_count
+
+get kibana_sample_data_flights/_search
+
+
+GET kibana_sample_data_flights/_search
+{
+  "size": 0,
+  "aggs": {
+    "weather": {
+      "terms": {
+        "field":"OriginWeather",
+        "size":5,
+        "show_term_doc_count_error":true
+      }
+    }
+  }
+}
+
+
+#由于我们有20个分片，所以会存在精准度问题，提高shard_size能降低doc_count_error_upper_bound，提高精准度。
+GET my_flights/_search
+{
+  "size": 0,
+  "aggs": {
+    "weather": {
+      "terms": {
+        "field":"OriginWeather",
+        "size":1,
+        "shard_size":1,
+        "show_term_doc_count_error":true
+      }
+    }
+  }
+}
+
+
+4：关于coordinate的注意事项？
+任何节点都具备coordinate的能力，也就是说你无法配置一个节点，不具备coordinate的角色。
+但是你可以配置只负责coordinate的节点。数据存储，都保存在数据节点上。
+一个节点如果是数据节点，则必然具备存储数据的能力，而ES中任何节点都天生具备路由的能力。
