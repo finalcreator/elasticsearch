@@ -140,7 +140,7 @@ POST users/_doc
 POST users/_doc
 {"name":"user4","age":40}
 
-# scroll=5m表示设置scroll_id保留5分钟可用
+# 创建一个快照，scroll=5m表示设置scroll_id保留5分钟可用
 POST /users/_search?scroll=5m
 {
     "size": 1,
