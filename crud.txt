@@ -70,6 +70,12 @@ POST _bulk
 { "update": {"_index": "test", "_id": 1} }
 { "doc": {"age": 21} }
 
+也可以这样：
+POST /test/_bulk
+{ "index": {"_id": 5} }
+{ "user": "Jackson", "age": 28 }
+{ "delete": {"_id": 3} }
+
 GET /test/_search
 {
   "query": { "match_all": {} }
