@@ -274,6 +274,13 @@ Update By Query 的使⽤场景：为字段新增⼦字段、字段更换分词�
 ● Remote ReIndex，需要修改 elasticsearch.yml 配置并且重启
 ● ⼀定要尽量使⽤ Index Alias 读写数据。即便发⽣ Reindex，也能够实现零停机维
 
+注意事项：
+1. Reindex requires _source to be enabled for all documents in the source index.
+2. Reindex does not attempt to set up the destination index. 
+It does not copy the settings of the source index. 
+You should set up the destination index prior to running a _reindex action, 
+including setting up mappings, shard counts, replicas, etc.
+
 ```
 ## 相关阅读
 - https://www.elastic.co/guide/en/elasticsearch/reference/7.1/docs-reindex.html
