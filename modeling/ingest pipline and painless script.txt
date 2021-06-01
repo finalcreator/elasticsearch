@@ -1,0 +1,359 @@
+1. Ingest Node
+● Elasticsearch 5.0 后，引⼊的⼀种新的节点类型。默认配置下，每个节点都是 Ingest Node
+○ 具有预处理数据的能⼒，可拦截 Index 或 Bulk API 的请求
+○ 对数据进⾏转换，并重新返回给 Index 或 Bulk API
+● ⽆需 Logstash，就可以进⾏数据的预处理，例如
+○ 为某个字段设置默认值；重命名某个字段的字段名；对字段值进⾏ Split 操作
+○ ⽀持设置 Painless 脚本，对数据进⾏更加复杂的加工。
+
+2. Pipeline & Processor
+● Pipeline - 管道会对通过的数据（⽂档），按照顺序进⾏加⼯
+● Processor - Elasticsearch 对⼀些加⼯的⾏为进⾏了抽象包装
+● Elasticsearch 有很多内置的 Processors。也⽀持通过插件的⽅式，实现⾃⼰的 Processor
+
+3. 实战Pipeline
+#Blog数据，包含3个字段，tags用逗号间隔
+PUT tech_blogs/_doc/1
+{
+  "title":"Introducing big data......",
+  "tags":"hadoop,elasticsearch,spark",
+  "content":"You konw, for big data"
+}
+Tags 字段中，逗号分隔的⽂本应该是数组，⽽不是⼀
+个字符串。
+需求：后期需要对 Tags 进⾏ Aggregation 统计。
+
+# 测试split tags, 使用split processors对docs中的数据进行拆分, _simulate模拟Pipline
+POST _ingest/pipeline/_simulate
+{
+  "pipeline": {
+    "description": "to split blog tags",
+    "processors": [
+      {
+        "split": {
+          "field": "tags",
+          "separator": ","
+        }
+      }
+    ]
+  },
+  "docs": [
+    {
+      "_index": "index",
+      "_id": "id",
+      "_source": {
+        "title": "Introducing big data......",
+        "tags": "hadoop,elasticsearch,spark",
+        "content": "You konw, for big data"
+      }
+    },
+    {
+      "_index": "index",
+      "_id": "idxx",
+      "_source": {
+        "title": "Introducing cloud computering",
+        "tags": "openstack,k8s",
+        "content": "You konw, for cloud"
+      }
+    }
+  ]
+}
+
+
+#使用set processors同时为文档，增加一个字段。
+POST _ingest/pipeline/_simulate
+{
+  "pipeline": {
+    "description": "to split blog tags",
+    "processors": [
+      {
+        "split": {
+          "field": "tags",
+          "separator": ","
+        }
+      },
+      {
+        "set":{
+          "field": "views",
+          "value": 0
+        }
+      }
+    ]
+  },
+
+  "docs": [
+    {
+      "_index":"index",
+      "_id":"id",
+      "_source":{
+        "title":"Introducing big data......",
+        "tags":"hadoop,elasticsearch,spark",
+        "content":"You konw, for big data"
+      }
+    },
+    {
+      "_index":"index",
+      "_id":"idxx",
+      "_source":{
+        "title":"Introducing cloud computering",
+        "tags":"openstack,k8s",
+        "content":"You konw, for cloud"
+      }
+    }
+    ]
+}
+
+
+# 为ES添加一个Pipeline，其中blog_pipeline为pipline的UID
+PUT _ingest/pipeline/blog_pipeline
+{
+  "description": "a blog pipeline",
+  "processors": [
+      {
+        "split": {
+          "field": "tags",
+          "separator": ","
+        }
+      },
+
+      {
+        "set":{
+          "field": "views",
+          "value": 0
+        }
+      }
+    ]
+}
+
+#查看Pipleline
+GET _ingest/pipeline/blog_pipeline
+
+
+#测试pipeline
+POST _ingest/pipeline/blog_pipeline/_simulate
+{
+  "docs": [
+    {
+      "_source": {
+        "title": "Introducing cloud computering",
+        "tags": "openstack,k8s",
+        "content": "You konw, for cloud"
+      }
+    }
+  ]
+}
+
+#不使用pipeline更新数据
+PUT tech_blogs/_doc/1
+{
+  "title":"Introducing big data......",
+  "tags":"hadoop,elasticsearch,spark",
+  "content":"You konw, for big data"
+}
+
+#使用pipeline更新数据
+PUT tech_blogs/_doc/2?pipeline=blog_pipeline
+{
+  "title": "Introducing cloud computering",
+  "tags": "openstack,k8s",
+  "content": "You konw, for cloud"
+}
+
+
+#查看两条数据，一条被处理，一条未被处理
+POST tech_blogs/_search
+{}
+
+#update_by_query 会导致错误
+POST tech_blogs/_update_by_query?pipeline=blog_pipeline
+{
+}
+
+#增加update_by_query的条件
+POST tech_blogs/_update_by_query?pipeline=blog_pipeline
+{
+    "query": {
+        "bool": {
+            "must_not": {
+                "exists": {
+                    "field": "views"
+                }
+            }
+        }
+    }
+}
+
+⼀些内置 Processors
+● https://www.elastic.co/guide/en/elasticsearch/reference/7.1/ingest-processors.html
+● Split Processor （例：将给定字段值分成⼀个数组）
+● Remove / Rename Processor （例：移除⼀个重命名字段）
+● Append （例：为商品增加⼀个新的标签）
+● Convert（例：将商品价格，从字符串转换成 float 类型）
+● Date / JSON（例：⽇期格式转换，字符串转 JSON 对象）
+● Date Index Name Processor （例：将通过该处理器的⽂档，分配到指定时间格式的索引中）
+● Fail Processor （⼀旦出现异常，该 Pipeline 指定的错误信息能返回给⽤户）
+● Foreach Process（数组字段，数组的每个元素都会使⽤到⼀个相同的处理器）
+● Grok Processor（⽇志的⽇期格式切割）
+● Gsub / Join / Split（字符串替换 / 数组转字符串/ 字符串转数组）
+● Lowercase / Upcase（⼤⼩写转换
+
+
+4. Painless
+● ⾃ Elasticsearch 5.x 后引⼊，专⻔为 Elasticsearch 设计，扩展了 Java 的语法。
+● 6.0 开始，ES 只⽀持 Painless。Groovy， JavaScript 和 Python 都不再⽀持
+● Painless ⽀持所有 Java 的数据类型及 Java API ⼦集
+● Painless Script 具备以下特性
+○ ⾼性能 / 安全
+○ ⽀持显示类型或者动态定义类型
+
+Painless 的⽤途
+● 可以对⽂档字段进⾏加⼯处理
+    更新或删除字段，处理数据聚合操作
+    Script Field：对返回的字段提前进⾏计算
+    Function Score：对⽂档的算分进⾏处理
+● 在 Ingest Pipeline 中执⾏脚本
+● 在 Reindex API，Update By Query 时，对数据进⾏处理
+
+5. 实战Painless
+# 增加一个 Script Prcessor， 并模拟执行，关键在于processor类型为script,并且通过source指定java代码作为脚本
+POST _ingest/pipeline/_simulate
+{
+  "pipeline": {
+    "description": "to split blog tags",
+    "processors": [
+      {
+        "split": {
+          "field": "tags",
+          "separator": ","
+        }
+      },
+      {
+        "script": {
+          "source": """
+          if(ctx.containsKey("content")){
+            ctx.content_length = ctx.content.length();
+          }else{
+            ctx.content_length=0;
+          }
+          """
+        }
+      },
+
+      {
+        "set":{
+          "field": "views",
+          "value": 0
+        }
+      }
+    ]
+  },
+
+  "docs": [
+    {
+      "_index":"index",
+      "_id":"id",
+      "_source":{
+        "title":"Introducing big data......",
+  "tags":"hadoop,elasticsearch,spark",
+  "content":"You konw, for big data"
+      }
+    },
+
+
+    {
+      "_index":"index",
+      "_id":"idxx",
+      "_source":{
+        "title":"Introducing cloud computering",
+  "tags":"openstack,k8s",
+  "content":"You konw, for cloud"
+      }
+    }
+
+    ]
+}
+
+
+DELETE tech_blogs
+PUT tech_blogs/_doc/1
+{
+  "title":"Introducing big data......",
+  "tags":"hadoop,elasticsearch,spark",
+  "content":"You konw, for big data",
+  "views":0
+}
+
+POST tech_blogs/_update/1
+{
+  "script": {
+    "source": "ctx._source.views += params.new_views",
+    "params": {
+      "new_views":100
+    }
+  }
+}
+
+# 查看views计数
+POST tech_blogs/_search
+{
+
+}
+
+#保存脚本在 Cluster State
+POST _scripts/update_views
+{
+  "script":{
+    "lang": "painless",
+    "source": "ctx._source.views += params.new_views"
+  }
+}
+
+POST tech_blogs/_update/1
+{
+  "script": {
+    "id": "update_views",
+    "params": {
+      "new_views":1000
+    }
+  }
+}
+
+
+GET tech_blogs/_search
+{
+  "script_fields": {
+    "rnd_views": {
+      "script": {
+        "lang": "painless",
+        "source": """
+          java.util.Random rnd = new Random();
+          doc['views'].value+rnd.nextInt(1000);
+        """
+      }
+    }
+  },
+  "query": {
+    "match_all": {}
+  }
+}
+
+
+6. 脚本缓存
+编译的开销相较⼤
+● Elasticsearch会将脚本编译后缓存在Cache 中
+● Inline scripts 和 Stored Scripts 都会被缓存
+● 默认缓存 100 个脚本
+
+script.cache.max_size 设置最⼤缓存数
+script.cache.expire 设置缓存超时
+script.max_compilations_rate 默认5分钟最多75次编译 （75/5m）
+
+```
+
+## 相关阅读
+- https://www.elastic.co/cn/blog/should-i-use-logstash-or-elasticsearch-ingest-nodes
+- https://www.elastic.co/guide/en/elasticsearch/reference/7.1/ingest-apis.html
+- https://www.elastic.co/guide/en/elasticsearch/reference/7.1/ingest-processors.html
+- https://www.elastic.co/guide/en/elasticsearch/painless/7.1/painless-lang-spec.html
+- https://www.elastic.co/guide/en/elasticsearch/painless/7.1/painless-api-reference.html
+```
