@@ -5,3 +5,276 @@
 Elasticsearch 的内置提供的 API
 ● Update By Query：在现有索引上重建
 ● Reindex：在其他索引上重建索引
+
+DELETE blogs/
+
+# 写入文档
+PUT blogs/_doc/1
+{
+  "content":"Hadoop is cool",
+  "keyword":"hadoop"
+}
+
+# 查看 Mapping
+GET blogs/_mapping
+
+# 修改 Mapping，增加子字段，使用英文分词器
+PUT blogs/_mapping
+{
+    "properties" : {
+        "content" : {
+            "type" : "text",
+            "fields" : {
+                "english" : {
+                    "type" : "text",
+                    "analyzer":"english"
+                }
+            }
+        }
+    }
+}
+
+
+# 写入文档
+PUT blogs/_doc/2
+{
+  "content":"Elasticsearch rocks",
+  "keyword":"elasticsearch"
+}
+
+# 变更属性后，查询新写入文档没有任何问题
+POST blogs/_search
+{
+  "query": {
+    "match": {
+      "content.english": "Elasticsearch"
+    }
+  }
+
+}
+
+# 查询 Mapping 变更前写入的文档，查询不到数据
+POST blogs/_search
+{
+  "query": {
+    "match": {
+      "content.english": "Hadoop"
+    }
+  }
+}
+
+
+# Update所有文档
+POST blogs/_update_by_query
+{
+
+}
+
+# 查询之前写入的文档, _update_by_query后没有问题
+POST blogs/_search
+{
+  "query": {
+    "match": {
+      "content.english": "Hadoop"
+    }
+  }
+}
+
+
+# 查询
+GET blogs/_mapping
+
+result:
+{
+    "blogs" : {
+      "mappings" : {
+        "properties" : {
+          "content" : {
+            "type" : "text",
+            "fields" : {
+              "english" : {
+                "type" : "text",
+                "analyzer" : "english"
+              },
+              "keyword" : {
+                "type" : "keyword",
+                "ignore_above" : 256
+              }
+            }
+          },
+          "keyword" : {
+            "type" : "text",
+            "fields" : {
+              "keyword" : {
+                "type" : "keyword",
+                "ignore_above" : 256
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+# 试图去修改type
+PUT blogs/_mapping
+{
+    "properties" : {
+    "content" : {
+        "type" : "text",
+        "fields" : {
+        "english" : {
+            "type" : "text",
+            "analyzer" : "english"
+        }
+        }
+    },
+    "keyword" : {
+        "type" : "keyword"
+    }
+    }
+}
+结果直接报错：
+{
+    "error" : {
+        "root_cause" : [
+        {
+            "type" : "illegal_argument_exception",
+            "reason" : "mapper [keyword] cannot be changed from type [text] to [keyword]"
+        }
+        ],
+        "type" : "illegal_argument_exception",
+        "reason" : "mapper [keyword] cannot be changed from type [text] to [keyword]"
+    },
+    "status" : 400
+}
+可见，在es中，属性的type是不能随意改变的，这时候就需要用到reindex
+  
+
+
+DELETE blogs_fix
+
+# 创建新的索引并且设定新的Mapping
+PUT blogs_fix/
+{
+  "mappings": {
+        "properties" : {
+        "content" : {
+          "type" : "text",
+          "fields" : {
+            "english" : {
+              "type" : "text",
+              "analyzer" : "english"
+            }
+          }
+        },
+        "keyword" : {
+          "type" : "keyword"
+        }
+      }    
+  }
+}
+
+# Reindx API
+POST  _reindex
+{
+  "source": {
+    "index": "blogs"
+  },
+  "dest": {
+    "index": "blogs_fix"
+  }
+}
+
+GET  blogs_fix/_doc/1
+
+# 测试 Term Aggregation
+POST blogs_fix/_search
+{
+  "size": 0,
+  "aggs": {
+    "blog_keyword": {
+      "terms": {
+        "field": "keyword",
+        "size": 10
+      }
+    }
+  }
+}
+
+
+# Reindx API，version Type Internal
+POST  _reindex
+{
+  "source": {
+    "index": "blogs"
+  },
+  "dest": {
+    "index": "blogs_fix",
+    "version_type": "internal"
+  }
+}
+version_type (not set) or setting it to internal will cause Elasticsearch to 
+blindly dump documents into the target, overwriting any that happen to
+have the same type and id.
+
+
+# 文档版本号增加
+GET  blogs_fix/_doc/1
+
+# Reindx API，version Type Internal
+POST  _reindex
+{
+  "source": {
+    "index": "blogs"
+  },
+  "dest": {
+    "index": "blogs_fix",
+    "version_type": "external"
+  }
+}
+Setting version_type to external will cause Elasticsearch to preserve the version from the source, 
+create any documents that are missing, and update any documents that have an older version 
+in the destination index than they do in the source index
+
+# Reindx API，version Type Internal
+POST  _reindex
+{
+  "source": {
+    "index": "blogs"
+  },
+  "dest": {
+    "index": "blogs_fix",
+    "version_type": "external"
+  },
+  "conflicts": "proceed"
+}
+
+# Reindx API，version Type Internal，设置op_type为create, _reindex 只会创建不存在的⽂档
+POST  _reindex
+{
+  "source": {
+    "index": "blogs"
+  },
+  "dest": {
+    "index": "blogs_fix",
+    "op_type": "create"
+  }
+}
+
+
+POST _reindex?wait_for_completion=false 可以异步执行reIndex操作，然后通过返回的taskId查看进度
+GET _tasks?detailed=true&actions=*reindex 查看所有reindex任务进度
+
+总结：
+Update By Query 的使⽤场景：为字段新增⼦字段、字段更换分词器、或更新分词器词库
+● Reindex API 的使⽤场景：修改字段类型、集群内数据迁移 / 跨集群的数据迁移、修改索引主分片数，
+  需要先对新索引设置 Mapping，索引的设置和映射关系不会被复制
+● 通过查看 Task API，了解 Reindex 的状况
+● Remote ReIndex，需要修改 elasticsearch.yml 配置并且重启
+● ⼀定要尽量使⽤ Index Alias 读写数据。即便发⽣ Reindex，也能够实现零停机维
+
+```
+## 相关阅读
+- https://www.elastic.co/guide/en/elasticsearch/reference/7.1/docs-reindex.html
+- https://www.elastic.co/guide/en/elasticsearch/reference/7.1/docs-update-by-query.html
