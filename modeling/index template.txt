@@ -1,0 +1,86 @@
+1. index template
+帮你设定settings和mappings，按照一定的规则自动匹配到新创建的索引上
+index template只对新创建的index有效，修改模板不会影响已经创建的index
+如果创建多个index template，这些设定会进行合并，可以通过设置“order”的数值来控制合并的过程
+
+工作方式：
+应用ES默认的settings和mappings
+->应用order数值低的index template
+  ->应用order数值高的index template
+    ->应用创建索引时用户指定的mappings和settings
+
+
+2. 实战
+#数字字符串被映射成text，日期字符串被映射成日期
+PUT ttemplate/_doc/1
+{
+	"someNumber":"1",
+	"someDate":"2019/01/01"
+}
+GET ttemplate/_mapping
+
+
+#Create a default template
+PUT _template/template_default
+{
+  "index_patterns": ["*"],
+  "order" : 0,
+  "version": 1,
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas":1
+  }
+}
+
+
+PUT /_template/template_test
+{
+    "index_patterns" : ["test*"],
+    "order" : 1,
+    "settings" : {
+    	"number_of_shards": 1,
+        "number_of_replicas" : 2
+    },
+    "mappings" : {
+    	"date_detection": false,
+    	"numeric_detection": true
+    }
+}
+
+#查看template信息
+GET /_template/template_default
+GET /_template/temp*
+
+
+#写入新的数据，index以test开头
+PUT testtemplate/_doc/1
+{
+	"someNumber":"1",
+	"someDate":"2019/01/01"
+}
+GET testtemplate/_mapping
+get testtemplate/_settings
+
+PUT testmy
+{
+	"settings":{
+		"number_of_replicas":5
+	}
+}
+
+put testmy/_doc/1
+{
+  "key":"value"
+}
+
+get testmy/_settings
+DELETE testmy
+DELETE /_template/template_default
+DELETE /_template/template_test
+
+3. index template 与 dynamic template的区别
+index template主要是针对settings和mappings中的一些配置项预创建一个模板template,
+这样新创建的index就会按照默认->index template(如果有多个，order大的优先级高)->用户创建index时的mapping
+来进行一些默认的配置。
+dynamic是针对字段的类型、或者字段内容满足某个条件（比如test*以test开头），而对具体的字段做一些处理，比如
+类型转换、copy_to组成一个新的字段等等。
