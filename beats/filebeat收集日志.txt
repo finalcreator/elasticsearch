@@ -1,0 +1,29 @@
+部署 filebeat
+
+解压：
+[root@elk ~]# tar -zxvf filebeat-7.12.0-linux-x86_64.tar.gz
+[root@elk ~]# mv filebeat-7.12.0-linux-x86_64 /usr/luoji/beats/filebeats/
+
+编辑配置文件：
+[root@elk ~]# cd /usr/luoji/beats/filebeats/filebeat-7.12.0-linux-x86_64
+[root@elk filebeat]# vim filebeat.yml
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - /usr/luoji/pypro/hello_flask/*.log
+
+setup.kibana:
+  host: "localhost:5601"
+ 
+output.elasticsearch:
+  hosts: ["localhost:9200"]
+
+后台启动 filebeat：
+[root@elk filebeat]# nohup ./filebeat -c filebeat.yml &
+
+参考：https://www.elastic.co/guide/en/beats/filebeat/current/configuration-filebeat-options.html
+           https://www.elastic.co/guide/en/beats/filebeat/current/configuring-howto-filebeat.html
+
+可以在Observablility -> Logs中直接查看到收集的日志
+或者，可以通过Management->Stack Management->Index Patterns,  输入filebeat*, 创建一个index, 然后就可以在discovery中通过 index看到日志了
