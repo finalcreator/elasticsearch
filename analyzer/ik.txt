@@ -1,0 +1,35 @@
+PUT /testik
+{
+  "mappings": {
+    "properties": {
+        "content": {
+            "type": "text",
+            "analyzer": "ik_max_word",
+            "search_analyzer": "ik_smart"
+        }
+    }
+  }
+}
+
+PUT testik/_doc/1
+{
+  "content": "美国留给伊拉克的是个烂摊子吗"
+}
+
+GET testik/_doc/1
+
+POST testik/_search
+{
+  "query": {
+    "match": {
+      "content": "伊拉克"
+    }
+  }
+}
+
+ik分词器安装：
+1）从下面网址下载与elasticsearch版本一样的ik plugin
+https://github.com/medcl/elasticsearch-analysis-ik/releases
+2）然后在elasticsearch的plugin目录创建ik目录，把ik的zip包放入ik目录解压
+3）重启elasticsearch
+更多参考：https://github.com/medcl/elasticsearch-analysis-ik
