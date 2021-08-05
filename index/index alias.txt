@@ -1,0 +1,115 @@
+PUT test1/_doc/1
+{
+  "text": "words words1",
+  "tag": "foo1"
+}
+
+PUT test2/_doc/1
+{
+  "text": "words words2",
+  "tag": "foo2"
+}
+
+#为test1设置一个别名alias1
+POST /_aliases
+{
+    "actions" : [
+        { "add" : { "index" : "test1", "alias" : "alias1" } }
+    ]
+}
+
+#删除别名test1的alias1,再将test2设置别名为alias1
+POST /_aliases
+{
+    "actions" : [
+        { "remove" : { "index" : "test1", "alias" : "alias1" } },
+        { "add" : { "index" : "test2", "alias" : "alias1" } }
+    ]
+}
+
+Multiple indices can be specified for an action with the indices array syntax:
+POST /_aliases
+{
+    "actions" : [
+        { "add" : { "index" : "test1", "alias" : "alias1" } },
+        { "add" : { "index" : "test2", "alias" : "alias1" } }
+    ]
+}
+这等价于：
+POST /_aliases
+{
+    "actions" : [
+        { "add" : { "indices" : ["test1", "test2"], "alias" : "alias1" } }
+    ]
+}
+
+
+这样words1可以从index test1中查到，words2可以从index test2中查到
+POST alias1/_search
+{
+  "query": {
+    "match": {
+      "text": "words2"
+    }
+  }
+}
+
+再写入一条数据
+PUT test2/_doc/2
+{
+  "text": "words words22",
+  "tag": "foo22"
+}
+
+POST alias1/_search
+{
+  "query": {
+    "match": {
+      "text": "words22"
+    }
+  }
+}
+也是可以查到的
+
+#将test*开头的index，设置别名all_test_indices
+POST /_aliases
+{
+    "actions" : [
+        { "add" : { "index" : "test*", "alias" : "all_test_indices" } }
+    ]
+}
+
+It is an error to index to an alias which points to more than one index
+
+
+It is also possible to swap an index with an alias in one operation:
+POST /_aliases
+{
+    "actions" : [
+        { "remove" : { "index" : "test1", "alias" : "alias1" } },
+        { "remove" : { "index" : "test2", "alias" : "alias1" } }
+    ]
+}
+delete test
+POST /_aliases
+{
+    "actions" : [
+        { "add" : { "index" : "test1", "alias" : "test" } }
+    ]
+}
+POST /_aliases
+{
+    "actions" : [
+        { "add":  { "index": "test2", "alias": "test" } },
+        { "remove_index": { "index": "test1" } }  
+    ]
+}
+比如test1的alias是test，对外服务也是用的test, 
+由于一些原因，test1做了reindex到test2，要把test2对外，而删掉test1，
+就可以用上面的方式，做到不停机迁移。
+第一句把test2添加到了alias test中
+然后remove_index就相当于delete index
+
+```
+## 相关阅读
+- https://www.elastic.co/guide/en/elasticsearch/reference/7.1/indices-aliases.html
