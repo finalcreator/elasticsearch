@@ -1,15 +1,19 @@
 1. Ingest Node
 ● Elasticsearch 5.0 后，引⼊的⼀种新的节点类型。默认配置下，每个节点都是 Ingest Node
-○ 具有预处理数据的能⼒，可拦截 Index 或 Bulk API 的请求
-○ 对数据进⾏转换，并重新返回给 Index 或 Bulk API
+  ○ 具有预处理数据的能⼒，可拦截 Index 或 Bulk API 的请求
+  ○ 对数据进⾏转换，并重新返回给 Index 或 Bulk API
 ● ⽆需 Logstash，就可以进⾏数据的预处理，例如
-○ 为某个字段设置默认值；重命名某个字段的字段名；对字段值进⾏ Split 操作
-○ ⽀持设置 Painless 脚本，对数据进⾏更加复杂的加工。
+  ○ 为某个字段设置默认值；重命名某个字段的字段名；对字段值进⾏ Split 操作
+  ○ ⽀持设置 Painless 脚本，对数据进⾏更加复杂的加工。
 
 2. Pipeline & Processor
 ● Pipeline - 管道会对通过的数据（⽂档），按照顺序进⾏加⼯
 ● Processor - Elasticsearch 对⼀些加⼯的⾏为进⾏了抽象包装
 ● Elasticsearch 有很多内置的 Processors。也⽀持通过插件的⽅式，实现⾃⼰的 Processor
+
+类比SpringBoot
+Pipeline <-> FilterChain
+Processort <-> Filter
 
 3. 实战Pipeline
 #Blog数据，包含3个字段，tags用逗号间隔
@@ -195,12 +199,12 @@ POST tech_blogs/_update_by_query?pipeline=blog_pipeline
 ● Foreach Process（数组字段，数组的每个元素都会使⽤到⼀个相同的处理器）
 ● Grok Processor（⽇志的⽇期格式切割）
 ● Gsub / Join / Split（字符串替换 / 数组转字符串/ 字符串转数组）
-● Lowercase / Upcase（⼤⼩写转换
+● Lowercase / Upcase（⼤⼩写转换）
 
 
 4. Painless
 ● ⾃ Elasticsearch 5.x 后引⼊，专⻔为 Elasticsearch 设计，扩展了 Java 的语法。
-● 6.0 开始，ES 只⽀持 Painless。Groovy， JavaScript 和 Python 都不再⽀持
+● 6.0 开始，ES 只⽀持 Painless。Groovy， JavaScript 和 Python 都不再⽀持。
 ● Painless ⽀持所有 Java 的数据类型及 Java API ⼦集
 ● Painless Script 具备以下特性
 ○ ⾼性能 / 安全
@@ -230,15 +234,14 @@ POST _ingest/pipeline/_simulate
       {
         "script": {
           "source": """
-          if(ctx.containsKey("content")){
-            ctx.content_length = ctx.content.length();
-          }else{
-            ctx.content_length=0;
-          }
+            if(ctx.containsKey("content")){
+              ctx.content_length = ctx.content.length();
+            }else{
+              ctx.content_length=0;
+            }
           """
         }
       },
-
       {
         "set":{
           "field": "views",
@@ -265,8 +268,8 @@ POST _ingest/pipeline/_simulate
       "_id":"idxx",
       "_source":{
         "title":"Introducing cloud computering",
-  "tags":"openstack,k8s",
-  "content":"You konw, for cloud"
+        "tags":"openstack,k8s",
+        "content":"You konw, for cloud"
       }
     }
 
