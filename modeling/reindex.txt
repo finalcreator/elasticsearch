@@ -269,6 +269,27 @@ POST  _reindex
   }
 }
 
+#Reindex API, change filed name
+POST test/_doc/1?refresh
+{
+  "text": "words words",
+  "flag": "foo"
+}
+
+POST _reindex
+{
+  "source": {
+    "index": "test"
+  },
+  "dest": {
+    "index": "test2"
+  },
+  "script": {
+    "source": "ctx._source.tag = ctx._source.remove(\"flag\")"
+  }
+}
+这时候test2中，就没有flag这个属性了，tag取而代之。
+
 
 POST _reindex?wait_for_completion=false 可以异步执行reIndex操作，然后通过返回的taskId查看进度
 GET _tasks?detailed=true&actions=*reindex 查看所有reindex任务进度
